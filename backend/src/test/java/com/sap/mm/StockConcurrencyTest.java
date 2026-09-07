@@ -78,6 +78,37 @@ public class StockConcurrencyTest extends TestSupport {
         }
     }
 
+    @Test
+    void initializesMissingStockRowBeforeConcurrentUpdates() throws Exception {
+        final String matnr = "CONC-" + UUID.randomUUID().toString().replace("-", "");
+        final String werks = "1000";
+        final String lgort = "9999";
+        stocks.delete(wrapper(matnr, werks, lgort));
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        try {
+            List<Future<Boolean>> additions = new ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                additions.add(executor.submit(new Callable<Boolean>() {
+                    @Override
+                    public Boolean call() {
+                        stock.change(matnr, werks, lgort, BigDecimal.ONE, BigDecimal.ZERO);
+                        return true;
+                    }
+                }));
+            }
+            for (Future<Boolean> addition : additions) {
+                assertEquals(Boolean.TRUE, get(addition));
+            }
+            assertEquals(0, stocks.selectOne(wrapper(matnr, werks, lgort)).getUnrestrictedQty()
+                    .compareTo(new BigDecimal("10")));
+        } finally {
+            executor.shutdownNow();
+            executor.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+            stocks.delete(wrapper(matnr, werks, lgort));
+        }
+    }
+
     private void seed(String matnr, String werks, String lgort, BigDecimal quantity) {
         stocks.delete(wrapper(matnr, werks, lgort));
         Stock value = new Stock();

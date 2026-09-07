@@ -4,17 +4,23 @@ import org.springframework.dao.DuplicateKeyException;
 import com.sap.basis.entity.NumberRange;
 import com.sap.basis.mapper.NumberRangeMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Locale;
 
 @Service
 public class NumberRangeService {
     private final NumberRangeMapper mapper;
+    private final TransactionTemplate requiresNew;
 
-    public NumberRangeService(NumberRangeMapper mapper) {
+    public NumberRangeService(NumberRangeMapper mapper, PlatformTransactionManager transactionManager) {
         this.mapper = mapper;
+        this.requiresNew = new TransactionTemplate(transactionManager);
+        this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -25,20 +31,33 @@ public class NumberRangeService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String next(String object, String requestedPrefix) {
         String prefix = requestedPrefix == null ? defaultPrefix(object) : requestedPrefix;
-        if (mapper.increment(object) == 0) {
-            try {
-                NumberRange range = new NumberRange();
-                range.setObjectName(object);
-                range.setPrefix(prefix);
-                range.setCurrentNo(1);
-                mapper.insert(range);
-                return format(prefix, 1);
-            } catch (DuplicateKeyException e) {
-                mapper.increment(object);
-            }
+        if (mapper.currentNo(object) == null) {
+            ensureRow(object, prefix);
         }
+
+        if (mapper.increment(object) != 1) {
+            throw new IllegalStateException("单号范围不存在: " + object);
+        }
+
         Integer currentNo = mapper.currentNo(object);
-        return format(prefix, currentNo == null ? 1 : currentNo);
+        if (currentNo == null) {
+            throw new IllegalStateException("单号范围不存在: " + object);
+        }
+        return format(prefix, currentNo);
+    }
+
+    private void ensureRow(String object, String prefix) {
+        requiresNew.execute(status -> {
+            NumberRange range = new NumberRange();
+            range.setObjectName(object);
+            range.setPrefix(prefix);
+            range.setCurrentNo(0);
+            try {
+                mapper.insert(range);
+            } catch (DuplicateKeyException ignored) {
+            }
+            return null;
+        });
     }
 
     private String format(String prefix, int number) {
