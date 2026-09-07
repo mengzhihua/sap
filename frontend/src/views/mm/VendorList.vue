@@ -1,0 +1,124 @@
+<template>
+  <PageShell
+    title="供应商主数据"
+    tcode="MK01"
+    ><template #actions
+      ><el-button
+        type="primary"
+        @click="open()"
+        >新建供应商</el-button
+      ></template
+    >
+    <el-card
+      ><div class="toolbar">
+        <el-input
+          v-model="query.q"
+          placeholder="供应商/名称/别名"
+          clearable
+          @keyup.enter="load"
+        /><el-button @click="load">搜索</el-button>
+      </div>
+      <el-table
+        :data="rows"
+        border
+        stripe
+        ><el-table-column
+          prop="lifnr"
+          label="供应商号"
+        /><el-table-column
+          prop="name"
+          label="名称"
+        /><el-table-column
+          prop="aliasCode"
+          label="外部编码"
+        /><el-table-column
+          prop="country"
+          label="国家"
+        /><el-table-column
+          prop="paymentTerm"
+          label="付款条件"
+        /><el-table-column
+          prop="reconAccount"
+          label="统驭科目"
+        /><el-table-column label="操作"
+          ><template #default="{ row }"
+            ><el-button
+              link
+              @click="open(row)"
+              >编辑</el-button
+            ></template
+          ></el-table-column
+        ></el-table
+      ><TablePager
+        v-bind="query"
+        :total="total"
+        @change="pageChange"
+        @size="sizeChange"
+    /></el-card>
+    <el-dialog
+      v-model="visible"
+      title="供应商"
+      width="500px"
+      ><el-form
+        :model="form"
+        label-width="100px"
+        ><el-form-item label="供应商号"
+          ><el-input
+            v-model="form.lifnr"
+            :disabled="editing" /></el-form-item
+        ><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item
+        ><el-form-item label="外部编码"><el-input v-model="form.aliasCode" /></el-form-item
+        ><el-form-item label="国家"><el-input v-model="form.country" /></el-form-item
+        ><el-form-item label="付款条件"><el-input v-model="form.paymentTerm" /></el-form-item
+        ><el-form-item label="统驭科目"><el-input v-model="form.reconAccount" /></el-form-item></el-form
+      ><template #footer
+        ><el-button @click="visible = false">取消</el-button
+        ><el-button
+          type="primary"
+          @click="save"
+          >保存</el-button
+        ></template
+      ></el-dialog
+    >
+  </PageShell>
+</template>
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import PageShell from '../../components/PageShell.vue'
+import TablePager from '../../components/TablePager.vue'
+import { mmApi } from '../../api'
+const rows = ref([])
+const total = ref(0)
+const visible = ref(false)
+const editing = ref(false)
+const form = reactive({})
+const query = reactive({ q: '', page: 1, size: 20 })
+async function load() {
+  const r = await mmApi.vendors(query)
+  rows.value = r.records || []
+  total.value = r.total || 0
+}
+function open(r) {
+  editing.value = !!r
+  Object.assign(
+    form,
+    r || { lifnr: '', name: '', aliasCode: '', country: 'CN', paymentTerm: '0001', reconAccount: '2201' },
+  )
+  visible.value = true
+}
+async function save() {
+  editing.value ? await mmApi.updateVendor(form.lifnr, form) : await mmApi.createVendor(form)
+  visible.value = false
+  load()
+}
+function pageChange(v) {
+  query.page = v
+  load()
+}
+function sizeChange(v) {
+  query.size = v
+  query.page = 1
+  load()
+}
+onMounted(load)
+</script>

@@ -1,0 +1,9 @@
+target/
+node_modules/
+dist/
+data/
+*.log
+backend/target/
+backend/data/
+*.mv.db
+*.trace.db

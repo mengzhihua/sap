@@ -1,0 +1,116 @@
+<template>
+  <PageShell
+    title="集成日志"
+    tcode="SLG1"
+    ><el-card
+      ><div class="toolbar">
+        <el-input
+          v-model="filters.system"
+          placeholder="系统"
+        /><el-select
+          v-model="filters.direction"
+          clearable
+          placeholder="方向"
+          ><el-option
+            label="IN"
+            value="IN" /><el-option
+            label="OUT"
+            value="OUT" /></el-select
+        ><el-button @click="load">查询</el-button>
+      </div>
+      <el-table
+        :data="rows"
+        border
+        stripe
+        ><el-table-column
+          prop="createdAt"
+          label="时间"
+        /><el-table-column
+          prop="systemName"
+          label="系统"
+        /><el-table-column
+          prop="direction"
+          label="方向"
+        /><el-table-column
+          prop="actionName"
+          label="动作"
+        /><el-table-column label="结果"
+          ><template #default="{ row }"
+            ><StatusTag :value="row.success ? 'SUCCESS' : 'FAIL'" /></template></el-table-column
+        ><el-table-column
+          prop="elapsedMs"
+          label="耗时(ms)"
+        /><el-table-column label="操作"
+          ><template #default="{ row }"
+            ><el-button
+              link
+              @click="show(row)"
+              >详情</el-button
+            ></template
+          ></el-table-column
+        ></el-table
+      ><TablePager
+        v-bind="filters"
+        :total="total"
+        @change="change" /></el-card
+    ><el-drawer
+      v-model="visible"
+      title="集成日志详情"
+      size="70%"
+      ><el-descriptions
+        :column="2"
+        border
+        ><el-descriptions-item label="系统">{{ selected?.systemName }}</el-descriptions-item
+        ><el-descriptions-item label="动作">{{ selected?.actionName }}</el-descriptions-item
+        ><el-descriptions-item label="耗时">{{ selected?.elapsedMs }} ms</el-descriptions-item
+        ><el-descriptions-item label="结果">{{
+          selected?.success ? '成功' : '失败'
+        }}</el-descriptions-item></el-descriptions
+      ><el-row
+        :gutter="16"
+        class="mt"
+        ><el-col :span="12"
+          ><h4>Request JSON</h4>
+          <pre>{{ pretty(selected?.requestBody || selected?.request) }}</pre></el-col
+        ><el-col :span="12"
+          ><h4>Response JSON</h4>
+          <pre>{{ pretty(selected?.responseBody || selected?.response) }}</pre>
+        </el-col></el-row
+      ></el-drawer
+    ></PageShell
+  >
+</template>
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import PageShell from '../../components/PageShell.vue'
+import TablePager from '../../components/TablePager.vue'
+import StatusTag from '../../components/StatusTag.vue'
+import { integrationApi } from '../../api'
+const rows = ref([])
+const total = ref(0)
+const visible = ref(false)
+const selected = ref(null)
+const filters = reactive({ system: '', direction: '', page: 1, size: 20 })
+async function load() {
+  const r = await integrationApi.logs(filters)
+  rows.value = r.records || []
+  total.value = r.total || 0
+}
+async function show(r) {
+  selected.value = await integrationApi.log(r.id)
+  visible.value = true
+}
+function pretty(x) {
+  if (!x) return ''
+  try {
+    return JSON.stringify(typeof x === 'string' ? JSON.parse(x) : x, null, 2)
+  } catch {
+    return x
+  }
+}
+function change(v) {
+  filters.page = v
+  load()
+}
+onMounted(load)
+</script>

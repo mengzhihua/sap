@@ -1,0 +1,28 @@
+import http from './request'
+
+export const mmApi = {
+  materials: (params) => http.get('/mm/materials', { params }),
+  material: (id) => http.get(`/mm/materials/${id}`),
+  createMaterial: (data) => http.post('/mm/materials', data),
+  updateMaterial: (id, data) => http.put(`/mm/materials/${id}`, data),
+  vendors: (params) => http.get('/mm/vendors', { params }),
+  vendor: (id) => http.get(`/mm/vendors/${id}`),
+  createVendor: (data) => http.post('/mm/vendors', data),
+  updateVendor: (id, data) => http.put(`/mm/vendors/${id}`, data),
+  prs: () => http.get('/mm/pr'),
+  createPr: (data) => http.post('/mm/pr', data),
+  releasePr: (id) => http.post(`/mm/pr/${id}/release`),
+  pos: () => http.get('/mm/po'),
+  po: (id) => http.get(`/mm/po/${id}`),
+  closePo: (id) => http.post(`/mm/po/${id}/close`),
+  createPo: (data) => http.post('/mm/po', data),
+  migo: (data) => http.post('/mm/migo', data),
+  stock: (params) => http.get('/mm/stock', { params }),
+  materialDocs: (params) => http.get('/mm/material-docs', { params }),
+  materialDoc: (id) => http.get(`/mm/material-docs/${id}`),
+  miro: (data) => http.post('/mm/miro', data),
+  invoices: () => http.get('/mm/supplier-invoices'),
+  invoice: (id) => http.get(`/mm/supplier-invoices/${id}`),
+  grir: () => http.get('/mm/gr-ir'),
+  evaluations: () => http.get('/mm/vendor-evaluations'),
+}

@@ -1,0 +1,94 @@
+<template>
+  <PageShell
+    title="客户主数据"
+    tcode="VD01"
+    ><template #actions
+      ><el-button
+        type="primary"
+        @click="open()"
+        >新建客户</el-button
+      ></template
+    ><el-card
+      ><div class="toolbar">
+        <el-input
+          v-model="q"
+          placeholder="客户/名称/别名"
+          @keyup.enter="load"
+        /><el-button @click="load">查询</el-button>
+      </div>
+      <el-table
+        :data="rows"
+        border
+        stripe
+        ><el-table-column
+          prop="kunnr"
+          label="客户号"
+        /><el-table-column
+          prop="name"
+          label="名称"
+        /><el-table-column
+          prop="aliasCode"
+          label="外部编码"
+        /><el-table-column
+          prop="reconAccount"
+          label="统驭科目"
+        /><el-table-column label="操作"
+          ><template #default="{ row }"
+            ><el-button
+              link
+              @click="open(row)"
+              >编辑</el-button
+            ></template
+          ></el-table-column
+        ></el-table
+      ></el-card
+    ><el-dialog
+      v-model="visible"
+      title="客户"
+      width="480px"
+      ><el-form
+        :model="form"
+        label-width="95px"
+        ><el-form-item label="客户号"
+          ><el-input
+            v-model="form.kunnr"
+            :disabled="editing" /></el-form-item
+        ><el-form-item label="名称"><el-input v-model="form.name" /></el-form-item
+        ><el-form-item label="外部编码"><el-input v-model="form.aliasCode" /></el-form-item
+        ><el-form-item label="统驭科目"><el-input v-model="form.reconAccount" /></el-form-item></el-form
+      ><template #footer
+        ><el-button @click="visible = false">取消</el-button
+        ><el-button
+          type="primary"
+          @click="save"
+          >保存</el-button
+        ></template
+      ></el-dialog
+    ></PageShell
+  >
+</template>
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import PageShell from '../../components/PageShell.vue'
+import { sdApi } from '../../api'
+const q = ref('')
+const rows = ref([])
+const visible = ref(false)
+const editing = ref(false)
+const form = reactive({})
+async function load() {
+  const r = await sdApi.customers({ q: q.value, page: 1, size: 50 })
+  rows.value = r.records || r || []
+}
+function open(r) {
+  editing.value = !!r
+  Object.assign(form, r || { kunnr: '', name: '', aliasCode: '', reconAccount: '1122' })
+  visible.value = true
+}
+async function save() {
+  editing.value ? await sdApi.updateCustomer(form.kunnr, form) : await sdApi.createCustomer(form)
+  visible.value = false
+  load()
+}
+onMounted(load)
+</script>
