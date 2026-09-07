@@ -1,6 +1,7 @@
 package com.sap.flow;
 
 import com.sap.TestSupport;
+import com.sap.common.BizException;
 import com.sap.sd.dto.*;
 import com.sap.sd.service.*;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,20 @@ public class SdFlowTest extends TestSupport {
         deliveries.pick(dn.getVbeln());
         com.sap.sd.entity.Delivery pgi = deliveries.pgi(dn.getVbeln());
         assertEquals("PGI", pgi.getStatus());
+        BigDecimal stockAfterPgi = jdbc.queryForObject(
+                "SELECT unrestricted_qty FROM sap_stock WHERE matnr='F2001' AND werks='1000' AND lgort='0002'",
+                BigDecimal.class);
+        int materialDocsAfterPgi = jdbc.queryForObject("SELECT COUNT(*) FROM sap_material_document WHERE ref_no=?",
+                Integer.class, dn.getVbeln());
+        assertThrows(BizException.class, () -> deliveries.pgi(dn.getVbeln()));
+        assertEquals(0, stockAfterPgi.compareTo(jdbc.queryForObject(
+                "SELECT unrestricted_qty FROM sap_stock WHERE matnr='F2001' AND werks='1000' AND lgort='0002'",
+                BigDecimal.class)));
+        assertEquals(materialDocsAfterPgi, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sap_material_document WHERE ref_no=?", Integer.class, dn.getVbeln()));
+
+        com.sap.sd.entity.Delivery open = deliveries.create(dnRequest);
+        assertThrows(BizException.class, () -> deliveries.pgi(open.getVbeln()));
         BillingRequest billingRequest = new BillingRequest(); billingRequest.setDnVbeln(dn.getVbeln());
         com.sap.sd.entity.BillingDoc billing = this.billing.create(billingRequest);
         assertEquals("POSTED", billing.getStatus());

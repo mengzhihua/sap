@@ -93,6 +93,7 @@ mvn spring-boot:run
 | `DB_NAME` | `sap` |
 | `DB_USER` | `root` |
 | `DB_PASSWORD` | `root` |
+| `SAP_CORS_ALLOWED_ORIGINS` | `http://localhost:5175` |
 
 使用 H2 模式：
 
