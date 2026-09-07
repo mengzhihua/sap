@@ -77,7 +77,12 @@ public class DeliveryService {
 
     @Transactional
     public Delivery pick(String id) {
-        Delivery delivery = require(id); delivery.setStatus("PICKED"); deliveries.updateById(delivery);
+        Delivery delivery = require(id);
+        if (!"OPEN".equals(delivery.getStatus())) {
+            throw new BizException("交货单状态不允许拣配: " + delivery.getStatus());
+        }
+        delivery.setStatus("PICKED");
+        deliveries.updateById(delivery);
         List<DeliveryItem> items = deliveryItems.selectList(new LambdaQueryWrapper<DeliveryItem>()
                 .eq(DeliveryItem::getVbeln, id));
         for (DeliveryItem item : items) { item.setPickedQty(item.getQty()); deliveryItems.updateById(item); }
@@ -86,6 +91,10 @@ public class DeliveryService {
 
     @Transactional
     public Delivery pgi(String id) {
+        if (deliveries.markPgi(id) == 0) {
+            Delivery current = require(id);
+            throw new BizException("交货单状态不允许发货过账: " + current.getStatus());
+        }
         Delivery delivery = require(id);
         List<DeliveryItem> lines = deliveryItems.selectList(new LambdaQueryWrapper<DeliveryItem>()
                 .eq(DeliveryItem::getVbeln, id));
