@@ -1,68 +1,151 @@
 package com.sap.pp.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sap.common.BizException;
 import com.sap.common.NumberRangeService;
 import com.sap.fi.service.AccountingDocumentService;
+import com.sap.mm.entity.Material;
+import com.sap.mm.entity.MaterialDocument;
+import com.sap.mm.entity.MaterialDocumentItem;
+import com.sap.mm.mapper.MaterialDocumentItemMapper;
+import com.sap.mm.mapper.MaterialDocumentMapper;
+import com.sap.mm.mapper.MaterialMapper;
 import com.sap.mm.service.ReferenceDataService;
 import com.sap.mm.service.StockService;
 import com.sap.pp.dto.ProductionOrderRequest;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.sap.pp.entity.Confirmation;
+import com.sap.pp.entity.ProductionOrder;
+import com.sap.pp.entity.ProductionOrderComponent;
+import com.sap.pp.mapper.ConfirmationMapper;
+import com.sap.pp.mapper.ProductionOrderComponentMapper;
+import com.sap.pp.mapper.ProductionOrderMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Service
 public class ProductionOrderService {
-    private final JdbcTemplate jdbc; private final NumberRangeService numbers; private final ReferenceDataService refs;
-    private final StockService stock; private final AccountingDocumentService accounting;
-    public ProductionOrderService(JdbcTemplate jdbc,NumberRangeService numbers,ReferenceDataService refs,StockService stock,AccountingDocumentService accounting){
-        this.jdbc=jdbc;this.numbers=numbers;this.refs=refs;this.stock=stock;this.accounting=accounting;
+    private final ProductionOrderMapper orders;
+    private final ProductionOrderComponentMapper components;
+    private final ConfirmationMapper confirmations;
+    private final MaterialMapper materials;
+    private final NumberRangeService numbers;
+    private final ReferenceDataService refs;
+    private final StockService stock;
+    private final AccountingDocumentService accounting;
+    private final MaterialDocumentMapper materialDocuments;
+    private final MaterialDocumentItemMapper materialDocumentItems;
+
+    public ProductionOrderService(ProductionOrderMapper orders, ProductionOrderComponentMapper components,
+                                  ConfirmationMapper confirmations, MaterialMapper materials,
+                                  NumberRangeService numbers, ReferenceDataService refs, StockService stock,
+                                  AccountingDocumentService accounting, MaterialDocumentMapper materialDocuments,
+                                  MaterialDocumentItemMapper materialDocumentItems) {
+        this.orders = orders; this.components = components; this.confirmations = confirmations;
+        this.materials = materials; this.numbers = numbers; this.refs = refs; this.stock = stock;
+        this.accounting = accounting; this.materialDocuments = materialDocuments;
+        this.materialDocumentItems = materialDocumentItems;
     }
-    @Transactional public Map<String,Object> create(ProductionOrderRequest request){
-        String aufnr=numbers.next("PRODORD"), mat=refs.material(request.getMatnr()), werks=refs.plant(request.getWerks());
-        BigDecimal target=request.getTargetQty(), planned=BigDecimal.ZERO;
-        jdbc.update("INSERT INTO sap_production_order(aufnr,matnr,werks,target_qty,delivered_qty,status,planned_cost,actual_cost) VALUES(?,?,?,?,0,?,?,0)",
-                aufnr,mat,werks,target,"CRTD",BigDecimal.ZERO);
-        for(Map<String,Object> item:jdbc.queryForList("SELECT * FROM sap_bom_item WHERE matnr=? AND werks=?",mat,werks)){
-            BigDecimal req=StockService.decimal(item,"qty").multiply(target);
-            BigDecimal price=jdbc.queryForObject("SELECT std_price FROM sap_material WHERE matnr=?",BigDecimal.class,item.get("component"));
-            planned=planned.add(req.multiply(price));
-            jdbc.update("INSERT INTO sap_production_order_component(aufnr,matnr,req_qty,issued_qty) VALUES(?,?,?,0)",aufnr,item.get("component"),req);
+
+    @Transactional
+    public ProductionOrder create(ProductionOrderRequest request) {
+        String aufnr = numbers.next("PRODORD");
+        String matnr = refs.material(request.getMatnr());
+        String werks = refs.plant(request.getWerks());
+        ProductionOrder order = new ProductionOrder();
+        order.setAufnr(aufnr); order.setMatnr(matnr); order.setWerks(werks);
+        order.setTargetQty(request.getTargetQty()); order.setDeliveredQty(BigDecimal.ZERO);
+        order.setStatus("CRTD"); order.setPlannedCost(BigDecimal.ZERO); order.setActualCost(BigDecimal.ZERO);
+        orders.insert(order);
+        return load(order);
+    }
+
+    @Transactional
+    public ProductionOrder release(String id) {
+        ProductionOrder order = require(id); order.setStatus("REL"); orders.updateById(order); return load(order);
+    }
+
+    @Transactional
+    public ProductionOrder issue(String id, String kostl) {
+        ProductionOrder order = require(id);
+        if (kostl == null || kostl.trim().isEmpty()) throw new BizException("成本中心不能为空");
+        BigDecimal total = BigDecimal.ZERO;
+        List<ProductionOrderComponent> lines = components.selectList(new LambdaQueryWrapper<ProductionOrderComponent>()
+                .eq(ProductionOrderComponent::getAufnr, id));
+        for (ProductionOrderComponent line : lines) {
+            BigDecimal qty = zero(line.getReqQty()).subtract(zero(line.getIssuedQty()));
+            if (qty.signum() <= 0) continue;
+            Material material = materials.selectById(line.getMatnr());
+            BigDecimal amount = qty.multiply(zero(material == null ? null : material.getStdPrice()));
+            stock.change(line.getMatnr(), order.getWerks(), "0001", qty.negate(), amount.negate());
+            line.setIssuedQty(zero(line.getReqQty())); components.updateById(line);
+            total = total.add(amount);
         }
-        jdbc.update("UPDATE sap_production_order SET planned_cost=? WHERE aufnr=?",planned,aufnr);
-        return one(aufnr);
-    }
-    @Transactional public Map<String,Object> release(String id){jdbc.update("UPDATE sap_production_order SET status='REL' WHERE aufnr=?",id);return one(id);}
-    @Transactional public Map<String,Object> issue(String id,String kostl){
-        Map<String,Object> order=one(id); BigDecimal total=BigDecimal.ZERO;
-        for(Map<String,Object> item:jdbc.queryForList("SELECT * FROM sap_production_order_component WHERE aufnr=?",id)){
-            BigDecimal qty=StockService.decimal(item,"req_qty").subtract(StockService.decimal(item,"issued_qty"));
-            BigDecimal price=jdbc.queryForObject("SELECT std_price FROM sap_material WHERE matnr=?",BigDecimal.class,item.get("matnr"));
-            stock.change(String.valueOf(item.get("matnr")),String.valueOf(order.get("werks")),"0001",qty.negate(),qty.multiply(price).negate());
-            accounting.post("WE","MM",id,Arrays.asList(new AccountingDocumentService.FiLine("5001","S",qty.multiply(price),kostl,null,null,"发料"),
-                    new AccountingDocumentService.FiLine("1411","H",qty.multiply(price),null,null,null,"库存减少")));
-            total=total.add(qty.multiply(price));
-            jdbc.update("UPDATE sap_production_order_component SET issued_qty=req_qty WHERE id=?",item.get("id"));
+        if (total.signum() > 0) {
+            accounting.post("WE", "PP", id, Arrays.asList(
+                    new AccountingDocumentService.FiLine("5001", "S", total, kostl, null, null, "发料"),
+                    new AccountingDocumentService.FiLine("1411", "H", total, null, null, null, "库存减少")));
         }
-        jdbc.update("UPDATE sap_production_order SET actual_cost=actual_cost+? WHERE aufnr=?",total,id); return one(id);
+        order.setActualCost(zero(order.getActualCost()).add(total)); orders.updateById(order);
+        return load(order);
     }
-    @Transactional public Map<String,Object> confirm(String id,BigDecimal qty){
-        jdbc.update("INSERT INTO sap_confirmation(aufnr,qty,budat) VALUES(?,?,CURRENT_DATE)",id,qty);
-        jdbc.update("UPDATE sap_production_order SET status='CNF' WHERE aufnr=?",id);
-        return jdbc.queryForMap("SELECT * FROM sap_confirmation WHERE id=IDENTITY()");
+
+    @Transactional
+    public Confirmation confirm(String id, BigDecimal qty) {
+        require(id);
+        Confirmation confirmation = new Confirmation();
+        confirmation.setAufnr(id); confirmation.setQty(qty); confirmation.setBudat(LocalDate.now());
+        confirmations.insert(confirmation);
+        ProductionOrder order = require(id); order.setStatus("CNF"); orders.updateById(order);
+        return confirmation;
     }
-    @Transactional public Map<String,Object> receipt(String id,BigDecimal qty){
-        Map<String,Object> order=one(id); String mat=String.valueOf(order.get("matnr"));
-        BigDecimal price=jdbc.queryForObject("SELECT std_price FROM sap_material WHERE matnr=?",BigDecimal.class,mat), amount=qty.multiply(price);
-        stock.change(mat,String.valueOf(order.get("werks")),"0002",qty,amount);
-        String fi=accounting.post("WE","PP",id,Arrays.asList(new AccountingDocumentService.FiLine("1405","S",amount,null,null,null,"完工入库"),
-                new AccountingDocumentService.FiLine("5001","H",amount,null,null,null,"生产成本")));
-        String mblnr=numbers.next("MATERIAL");
-        jdbc.update("INSERT INTO sap_material_document(mblnr,mjahr,budat,bwart,ref_type,ref_no,fi_belnr) VALUES(?,?,CURRENT_DATE,'101','PRODORD',?,?)",
-                mblnr,String.valueOf(LocalDate.now().getYear()),id,fi);
-        jdbc.update("UPDATE sap_production_order SET delivered_qty=delivered_qty+?,status='CNF' WHERE aufnr=?",qty,id);
-        return jdbc.queryForMap("SELECT * FROM sap_material_document WHERE mblnr=?",mblnr);
+
+    @Transactional
+    public MaterialDocument receipt(String id, BigDecimal qty) {
+        ProductionOrder order = require(id);
+        Material material = materials.selectById(order.getMatnr());
+        BigDecimal amount = qty.multiply(zero(material == null ? null : material.getStdPrice()));
+        stock.change(order.getMatnr(), order.getWerks(), "0002", qty, amount);
+        String fi = accounting.post("WE", "PP", id, Arrays.asList(
+                new AccountingDocumentService.FiLine("1405", "S", amount, null, null, null, "完工入库"),
+                new AccountingDocumentService.FiLine("5001", "H", amount, null, null, null, "生产成本")));
+        String mblnr = numbers.next("MATERIAL");
+        MaterialDocument document = new MaterialDocument();
+        document.setMblnr(mblnr); document.setMjahr(String.valueOf(LocalDate.now().getYear()));
+        document.setBudat(LocalDate.now()); document.setBwart("101"); document.setRefType("PRODORD");
+        document.setRefNo(id); document.setFiBelnr(fi); materialDocuments.insert(document);
+        MaterialDocumentItem item = new MaterialDocumentItem();
+        item.setMblnr(mblnr); item.setZeile("1"); item.setMatnr(order.getMatnr());
+        item.setWerks(order.getWerks()); item.setLgort("0002"); item.setMenge(qty);
+        item.setAmount(amount); item.setBwart("101"); item.setAufnr(id); materialDocumentItems.insert(item);
+        order.setDeliveredQty(zero(order.getDeliveredQty()).add(qty)); order.setStatus("CNF"); orders.updateById(order);
+        document.setItems(java.util.Collections.singletonList(item));
+        return document;
     }
-    @Transactional public Map<String,Object> teco(String id){jdbc.update("UPDATE sap_production_order SET status='TECO' WHERE aufnr=?",id);return one(id);}
-    private Map<String,Object> one(String id){return jdbc.queryForMap("SELECT * FROM sap_production_order WHERE aufnr=?",id);}
+
+    @Transactional
+    public ProductionOrder teco(String id) {
+        ProductionOrder order = require(id); order.setStatus("TECO"); orders.updateById(order); return load(order);
+    }
+
+    public ProductionOrder one(String id) { return load(require(id)); }
+
+    private ProductionOrder require(String id) {
+        ProductionOrder order = orders.selectById(id);
+        if (order == null) throw new BizException("生产订单不存在: " + id);
+        return order;
+    }
+
+    private ProductionOrder load(ProductionOrder order) {
+        order.setComponents(components.selectList(new LambdaQueryWrapper<ProductionOrderComponent>()
+                .eq(ProductionOrderComponent::getAufnr, order.getAufnr())));
+        return order;
+    }
+
+    private static BigDecimal zero(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
 }

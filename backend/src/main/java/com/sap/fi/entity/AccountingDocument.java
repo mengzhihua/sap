@@ -3,6 +3,7 @@ package com.sap.fi.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.sap.common.BaseEntity;
 import lombok.Data;
+import java.util.List;
 
 @Data @TableName("sap_acc_document")
 public class AccountingDocument extends BaseEntity {
@@ -18,4 +19,8 @@ public class AccountingDocument extends BaseEntity {
     private String refNo;
     private String source;
     private String reversedBy;
+    @TableField("cleared_by")
+    private String clearedBy;
+    @TableField(exist = false)
+    private List<AccountingDocumentItem> items;
 }

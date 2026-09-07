@@ -1,29 +1,50 @@
 package com.sap.fi.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sap.co.entity.CoDocument;
+import com.sap.co.mapper.CoDocumentMapper;
 import com.sap.common.BizException;
 import com.sap.common.NumberRangeService;
 import com.sap.fi.dto.FiDocumentRequest;
 import com.sap.fi.dto.PaymentRequest;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.sap.fi.entity.AccountingDocument;
+import com.sap.fi.entity.AccountingDocumentItem;
+import com.sap.fi.entity.Payment;
+import com.sap.fi.mapper.AccountingDocumentItemMapper;
+import com.sap.fi.mapper.AccountingDocumentMapper;
+import com.sap.fi.mapper.PaymentMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AccountingDocumentService {
-    private final JdbcTemplate jdbc;
+    private final AccountingDocumentMapper documents;
+    private final AccountingDocumentItemMapper items;
+    private final PaymentMapper payments;
+    private final CoDocumentMapper coDocuments;
     private final NumberRangeService numbers;
 
-    public AccountingDocumentService(JdbcTemplate jdbc, NumberRangeService numbers) {
-        this.jdbc = jdbc;
+    public AccountingDocumentService(AccountingDocumentMapper documents,
+                                     AccountingDocumentItemMapper items,
+                                     PaymentMapper payments,
+                                     CoDocumentMapper coDocuments,
+                                     NumberRangeService numbers) {
+        this.documents = documents;
+        this.items = items;
+        this.payments = payments;
+        this.coDocuments = coDocuments;
         this.numbers = numbers;
     }
 
     @Transactional
-    public Map<String, Object> post(FiDocumentRequest request) {
+    public AccountingDocument post(FiDocumentRequest request) {
         List<FiLine> lines = new ArrayList<>();
         for (FiDocumentRequest.Item item : request.getItems()) {
             lines.add(new FiLine(item.getSaknr(), item.getShkzg(), item.getAmount(), item.getKostl(),
@@ -33,45 +54,74 @@ public class AccountingDocumentService {
     }
 
     @Transactional
-    public Map<String, Object> payment(PaymentRequest request) {
-        String partner = request.getPartner();
+    public AccountingDocument payment(PaymentRequest request) {
         String type = request.getType();
+        boolean ap = "AP".equalsIgnoreCase(type);
+        String partner = request.getPartner();
+        List<String> clearDocs = request.getClearDocs() == null
+                ? new ArrayList<>() : request.getClearDocs();
+        validateClearDocs(clearDocs, ap, partner);
+
         List<FiLine> lines;
-        if ("AP".equalsIgnoreCase(type)) {
-            lines = Arrays.asList(new FiLine("2201", "S", request.getAmount(), null, partner, null, "付款"),
+        if (ap) {
+            lines = Arrays.asList(
+                    new FiLine("2201", "S", request.getAmount(), null, partner, null, "付款"),
                     new FiLine("1002", "H", request.getAmount(), null, null, null, "银行付款"));
         } else {
-            lines = Arrays.asList(new FiLine("1002", "S", request.getAmount(), null, null, null, "银行收款"),
+            lines = Arrays.asList(
+                    new FiLine("1002", "S", request.getAmount(), null, null, null, "银行收款"),
                     new FiLine("1122", "H", request.getAmount(), null, null, partner, "收款"));
         }
-        Map<String, Object> doc = document("KZ", "FI", partner, lines);
-        jdbc.update("INSERT INTO sap_payment(type,partner,amount,belnr,cleared_docs) VALUES(?,?,?,?,?)",
-                type, partner, request.getAmount(), doc.get("belnr"), null);
-        return doc;
+        AccountingDocument document = document(ap ? "KZ" : "DZ", "FI", partner, lines);
+        Payment payment = new Payment();
+        payment.setType(type);
+        payment.setPartner(partner);
+        payment.setAmount(request.getAmount());
+        payment.setBelnr(document.getBelnr());
+        payment.setClearedDocs(clearDocs.isEmpty() ? null : String.join(",", clearDocs));
+        payments.insert(payment);
+        for (String clearDoc : clearDocs) {
+            AccountingDocument openItem = documents.selectOne(new LambdaQueryWrapper<AccountingDocument>()
+                    .eq(AccountingDocument::getBelnr, clearDoc));
+            openItem.setClearedBy(document.getBelnr());
+            documents.updateById(openItem);
+        }
+        return document;
     }
 
     @Transactional
-    public Map<String, Object> reverse(String belnr) {
-        Map<String, Object> original = jdbc.queryForMap("SELECT * FROM sap_acc_document WHERE belnr=?", belnr);
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM sap_acc_document_item WHERE belnr=?", belnr);
-        List<FiLine> lines = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            String shkzg = "S".equals(row.get("shkzg")) ? "H" : "S";
-            lines.add(new FiLine(String.valueOf(row.get("saknr")), shkzg,
-                    new BigDecimal(String.valueOf(row.get("amount"))),
-                    value(row, "kostl"), value(row, "lifnr"), value(row, "kunnr"), "冲销"));
+    public AccountingDocument reverse(String belnr) {
+        AccountingDocument original = documents.selectOne(new LambdaQueryWrapper<AccountingDocument>()
+                .eq(AccountingDocument::getBelnr, belnr));
+        if (original == null) throw new BizException("会计凭证不存在: " + belnr);
+        if ("AB".equalsIgnoreCase(original.getBlart()) || original.getReversedBy() != null) {
+            throw new BizException("会计凭证已冲销: " + belnr);
         }
-        Map<String, Object> reversal = document("AB", "FI", belnr, lines);
-        jdbc.update("UPDATE sap_acc_document SET reversed_by=? WHERE belnr=?", reversal.get("belnr"), belnr);
+        List<AccountingDocumentItem> originalItems = items.selectList(new LambdaQueryWrapper<AccountingDocumentItem>()
+                .eq(AccountingDocumentItem::getBelnr, belnr));
+        List<FiLine> lines = originalItems.stream()
+                .map(item -> new FiLine(item.getSaknr(), "S".equals(item.getShkzg()) ? "H" : "S",
+                        item.getAmount(), item.getKostl(), item.getLifnr(), item.getKunnr(), "冲销"))
+                .collect(Collectors.toList());
+        AccountingDocument reversal = document("AB", "FI", belnr, lines);
+        original.setReversedBy(reversal.getBelnr());
+        documents.updateById(original);
         return reversal;
     }
 
     @Transactional
     public String post(String blart, String source, String refNo, List<FiLine> lines) {
-        return String.valueOf(document(blart, source, refNo, lines).get("belnr"));
+        return document(blart, source, refNo, lines).getBelnr();
     }
 
-    private Map<String, Object> document(String blart, String source, String refNo, List<FiLine> lines) {
+    public AccountingDocument find(String belnr) {
+        AccountingDocument document = documents.selectOne(new LambdaQueryWrapper<AccountingDocument>()
+                .eq(AccountingDocument::getBelnr, belnr));
+        if (document == null) throw new BizException("会计凭证不存在: " + belnr);
+        return load(document);
+    }
+
+    private AccountingDocument document(String blart, String source, String refNo, List<FiLine> lines) {
         if (lines.size() < 2) throw new BizException("会计凭证至少需要两行");
         BigDecimal debit = BigDecimal.ZERO;
         BigDecimal credit = BigDecimal.ZERO;
@@ -85,24 +135,67 @@ public class AccountingDocumentService {
             throw new BizException("借贷不平衡: 借方=" + debit + ",贷方=" + credit);
         }
         String belnr = numbers.next("FI");
-        jdbc.update("INSERT INTO sap_acc_document(belnr,gjahr,bukrs,blart,budat,bldat,waers,header_text,ref_no,source) VALUES(?,?,?, ?,CURRENT_DATE,CURRENT_DATE,'CNY',?,?,?)",
-                belnr, String.valueOf(LocalDate.now().getYear()), "1000", blart, source, refNo, source);
-        int i = 1;
+        AccountingDocument document = new AccountingDocument();
+        document.setBelnr(belnr);
+        document.setGjahr(String.valueOf(LocalDate.now().getYear()));
+        document.setBukrs("1000");
+        document.setBlart(blart);
+        document.setBudat(LocalDate.now());
+        document.setBldat(LocalDate.now());
+        document.setWaers("CNY");
+        document.setHeaderText(source);
+        document.setRefNo(refNo);
+        document.setSource(source);
+        documents.insert(document);
+        int lineNo = 1;
         for (FiLine line : lines) {
-            jdbc.update("INSERT INTO sap_acc_document_item(belnr,buzei,bschl,shkzg,saknr,lifnr,kunnr,kostl,amount,text) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    belnr, String.valueOf(i++), "S".equalsIgnoreCase(line.shkzg) ? "40" : "50",
-                    line.shkzg, line.saknr, line.lifnr, line.kunnr, line.kostl, line.amount, line.text);
+            AccountingDocumentItem item = new AccountingDocumentItem();
+            item.setBelnr(belnr);
+            item.setBuzei(String.valueOf(lineNo++));
+            item.setBschl("S".equalsIgnoreCase(line.shkzg) ? "40" : "50");
+            item.setShkzg(line.shkzg);
+            item.setSaknr(line.saknr);
+            item.setLifnr(line.lifnr);
+            item.setKunnr(line.kunnr);
+            item.setKostl(line.kostl);
+            item.setAmount(line.amount);
+            item.setItemText(line.text);
+            items.insert(item);
             if (line.kostl != null && !line.kostl.trim().isEmpty()) {
-                jdbc.update("INSERT INTO sap_co_document(fi_belnr,kostl,cost_element,amount,budat,text) VALUES(?,?,?, ?,CURRENT_DATE,?)",
-                        belnr, line.kostl, line.saknr, line.amount, line.text);
+                CoDocument co = new CoDocument();
+                co.setFiBelnr(belnr);
+                co.setKostl(line.kostl);
+                co.setCostElement(line.saknr);
+                co.setAmount(line.amount);
+                co.setBudat(LocalDate.now());
+                co.setDocumentText(line.text);
+                coDocuments.insert(co);
             }
         }
-        return jdbc.queryForMap("SELECT * FROM sap_acc_document WHERE belnr=?", belnr);
+        return load(document);
     }
 
-    private static String value(Map<String, Object> row, String key) {
-        Object value = row.get(key);
-        return value == null ? null : String.valueOf(value);
+    private AccountingDocument load(AccountingDocument document) {
+        document.setItems(items.selectList(new LambdaQueryWrapper<AccountingDocumentItem>()
+                .eq(AccountingDocumentItem::getBelnr, document.getBelnr())));
+        return document;
+    }
+
+    private void validateClearDocs(List<String> clearDocs, boolean ap, String partner) {
+        for (String belnr : clearDocs) {
+            AccountingDocument document = documents.selectOne(new LambdaQueryWrapper<AccountingDocument>()
+                    .eq(AccountingDocument::getBelnr, belnr));
+            if (document == null || "AB".equalsIgnoreCase(document.getBlart())
+                    || document.getReversedBy() != null || document.getClearedBy() != null) {
+                throw new BizException("待清账凭证不可用: " + belnr);
+            }
+            String account = ap ? "2201" : "1122";
+            AccountingDocumentItem item = items.selectOne(new LambdaQueryWrapper<AccountingDocumentItem>()
+                    .eq(AccountingDocumentItem::getBelnr, belnr)
+                    .eq(AccountingDocumentItem::getSaknr, account)
+                    .eq(ap ? AccountingDocumentItem::getLifnr : AccountingDocumentItem::getKunnr, partner));
+            if (item == null) throw new BizException("待清账凭证不属于业务伙伴: " + belnr);
+        }
     }
 
     public static final class FiLine {
@@ -113,6 +206,7 @@ public class AccountingDocumentService {
         public final String lifnr;
         public final String kunnr;
         public final String text;
+
         public FiLine(String saknr, String shkzg, BigDecimal amount, String kostl,
                       String lifnr, String kunnr, String text) {
             this.saknr = saknr;

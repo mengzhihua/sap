@@ -1,20 +1,21 @@
 package com.sap.system.service;
 
+import com.sap.basis.entity.User;
+import com.sap.basis.mapper.UserMapper;
 import com.sap.system.auth.PasswordHasher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class UserInitializer implements ApplicationRunner {
-    private final JdbcTemplate jdbc;
+    private final UserMapper users;
     private final String adminPassword;
 
-    public UserInitializer(JdbcTemplate jdbc,
+    public UserInitializer(UserMapper users,
                            @Value("${sap.auth.admin-password:admin123}") String adminPassword) {
-        this.jdbc = jdbc;
+        this.users = users;
         this.adminPassword = adminPassword;
     }
 
@@ -28,9 +29,11 @@ public class UserInitializer implements ApplicationRunner {
     }
 
     private void create(String username, String password, String name, String role) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sap_user WHERE username=?", Integer.class, username);
-        if (count != null && count > 0) return;
-        jdbc.update("INSERT INTO sap_user(username,password,real_name,role,status) VALUES(?,?,?,?,1)",
-                username, PasswordHasher.hash(password), name, role);
+        if (users.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<User>()
+                .eq(User::getUsername, username)) != null) return;
+        User user = new User();
+        user.setUsername(username); user.setPassword(PasswordHasher.hash(password));
+        user.setRealName(name); user.setRole(role); user.setStatus(1);
+        users.insert(user);
     }
 }

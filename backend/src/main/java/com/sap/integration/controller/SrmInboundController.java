@@ -32,9 +32,9 @@ public class SrmInboundController {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            Map<String, Object> po = service.po(body);
+            com.sap.mm.entity.PurchaseOrder po = service.po(body);
             Map<String, Object> d = new HashMap<>();
-            d.put("PurchaseOrder", po.get("ebeln"));
+            d.put("PurchaseOrder", po.getEbeln());
             log("SRM_CREATE_PO", body, d, true, null, start);
             return ResponseEntity.ok(map("d", d));
         } catch (RuntimeException e) {
@@ -49,10 +49,10 @@ public class SrmInboundController {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            Map<String, Object> doc = service.gr(body);
+            com.sap.mm.entity.MaterialDocument doc = service.gr(body);
             Map<String, Object> d = new HashMap<>();
-            d.put("MaterialDocument", doc.get("mblnr"));
-            d.put("MaterialDocumentYear", doc.get("mjahr"));
+            d.put("MaterialDocument", doc.getMblnr());
+            d.put("MaterialDocumentYear", doc.getMjahr());
             log("SRM_POST_GR", body, d, true, null, start);
             return ResponseEntity.ok(map("d", d));
         } catch (RuntimeException e) {
@@ -67,10 +67,10 @@ public class SrmInboundController {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            Map<String, Object> inv = service.invoice(body);
+            com.sap.mm.entity.SupplierInvoice inv = service.invoice(body);
             Map<String, Object> d = new HashMap<>();
-            d.put("SupplierInvoice", inv.get("belnr"));
-            d.put("FiscalYear", inv.get("gjahr"));
+            d.put("SupplierInvoice", inv.getBelnr());
+            d.put("FiscalYear", inv.getGjahr());
             log("SRM_POST_INVOICE", body, d, true, null, start);
             return ResponseEntity.ok(map("d", d));
         } catch (RuntimeException e) {

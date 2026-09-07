@@ -18,10 +18,10 @@ public class PpFlowTest extends TestSupport {
     void productionOrderIssueAndReceipt() {
         ProductionOrderRequest request = new ProductionOrderRequest();
         request.setMatnr("F2001"); request.setWerks("1000"); request.setTargetQty(new java.math.BigDecimal("1"));
-        Map<String, Object> order = service.create(request);
-        String id = String.valueOf(order.get("aufnr"));
-        assertEquals("REL", service.release(id).get("status"));
-        assertEquals("REL", service.issue(id, "CC1000").get("status"));
-        assertNotNull(service.receipt(id, new java.math.BigDecimal("1")).get("mblnr"));
+        com.sap.pp.entity.ProductionOrder order = service.create(request);
+        String id = order.getAufnr();
+        assertEquals("REL", service.release(id).getStatus());
+        assertEquals("REL", service.issue(id, "CC1000").getStatus());
+        assertNotNull(service.receipt(id, new java.math.BigDecimal("1")).getMblnr());
     }
 }

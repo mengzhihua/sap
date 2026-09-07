@@ -3,6 +3,7 @@ package com.sap.sd.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.sap.common.BaseEntity;
 import lombok.Data;
+import java.util.List;
 
 @Data @TableName("sap_sales_order")
 public class SalesOrder extends BaseEntity {
@@ -12,4 +13,6 @@ public class SalesOrder extends BaseEntity {
     private String vkorg;
     private String waers;
     private String status;
+    @TableField(exist = false)
+    private List<SalesOrderItem> items;
 }

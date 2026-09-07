@@ -1,36 +1,35 @@
 package com.sap.mm.service;
 
 import com.sap.common.BizException;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sap.mm.entity.Stock;
+import com.sap.mm.mapper.StockMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
-
 @Service
 public class StockService {
-    private final JdbcTemplate jdbc;
-    public StockService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final StockMapper mapper;
+    public StockService(StockMapper mapper) { this.mapper = mapper; }
 
     @Transactional
     public void change(String matnr, String werks, String lgort, BigDecimal qty, BigDecimal value) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM sap_stock WHERE matnr=? AND werks=? AND lgort=?", matnr, werks, lgort);
-        if (rows.isEmpty()) {
+        Stock current = mapper.selectOne(new LambdaQueryWrapper<Stock>()
+                .eq(Stock::getMatnr, matnr).eq(Stock::getWerks, werks).eq(Stock::getLgort, lgort));
+        if (current == null) {
             if (qty.compareTo(BigDecimal.ZERO) < 0) throw new BizException("库存不足: " + matnr);
-            jdbc.update("INSERT INTO sap_stock(matnr,werks,lgort,unrestricted_qty,value) VALUES(?,?,?,?,?)",
-                    matnr, werks, lgort, qty, value);
+            current = new Stock();
+            current.setMatnr(matnr); current.setWerks(werks); current.setLgort(lgort);
+            current.setUnrestrictedQty(qty); current.setStockValue(value);
+            mapper.insert(current);
             return;
         }
-        BigDecimal current = decimal(rows.get(0), "unrestricted_qty");
-        if (current.add(qty).compareTo(BigDecimal.ZERO) < 0) throw new BizException("库存不足: " + matnr);
-        jdbc.update("UPDATE sap_stock SET unrestricted_qty=unrestricted_qty+?,value=value+? WHERE matnr=? AND werks=? AND lgort=?",
-                qty, value, matnr, werks, lgort);
-    }
-    public static BigDecimal decimal(Map<String, Object> row, String key) {
-        Object value = row.get(key);
-        return value == null ? BigDecimal.ZERO : new BigDecimal(String.valueOf(value));
+        BigDecimal quantity = current.getUnrestrictedQty() == null ? BigDecimal.ZERO : current.getUnrestrictedQty();
+        if (quantity.add(qty).compareTo(BigDecimal.ZERO) < 0) throw new BizException("库存不足: " + matnr);
+        current.setUnrestrictedQty(quantity.add(qty));
+        current.setStockValue((current.getStockValue() == null ? BigDecimal.ZERO : current.getStockValue()).add(value));
+        mapper.update(current, new LambdaQueryWrapper<Stock>()
+                .eq(Stock::getMatnr, matnr).eq(Stock::getWerks, werks).eq(Stock::getLgort, lgort));
     }
 }

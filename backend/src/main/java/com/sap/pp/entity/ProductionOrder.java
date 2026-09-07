@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import com.sap.common.BaseEntity;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data @TableName("sap_production_order")
 public class ProductionOrder extends BaseEntity {
@@ -15,4 +16,6 @@ public class ProductionOrder extends BaseEntity {
     private String status;
     private BigDecimal plannedCost;
     private BigDecimal actualCost;
+    @TableField(exist = false)
+    private List<ProductionOrderComponent> components;
 }

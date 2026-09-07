@@ -1,34 +1,33 @@
 package com.sap.integration.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sap.integration.entity.IntegrationLog;
+import com.sap.integration.mapper.IntegrationLogMapper;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
+import java.util.List;
 
 @Service
 public class IntegrationLogService {
-    private final JdbcTemplate jdbc;
+    private final IntegrationLogMapper logs;
 
-    public IntegrationLogService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public IntegrationLogService(IntegrationLogMapper logs) {
+        this.logs = logs;
     }
 
     public void write(String direction, String system, String action, Object request,
                       Object response, boolean success, String error, long elapsed) {
-        jdbc.update("INSERT INTO sap_integration_log(direction,system_name,action_name,request,response,success,error,elapsed_ms,created_at)"
-                        + " VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
-                direction, system, action, String.valueOf(request), String.valueOf(response),
-                success ? 1 : 0, error, elapsed);
+        IntegrationLog log = new IntegrationLog();
+        log.setDirection(direction); log.setSystemName(system); log.setActionName(action);
+        log.setRequest(String.valueOf(request)); log.setResponse(String.valueOf(response));
+        log.setSuccess(success ? 1 : 0); log.setError(error); log.setElapsedMs(elapsed);
+        logs.insert(log);
     }
 
-    public java.util.List<Map<String, Object>> list(String system, String direction) {
-        if (system != null && direction != null) {
-            return jdbc.queryForList("SELECT * FROM sap_integration_log WHERE system_name=? AND direction=? ORDER BY id DESC",
-                    system, direction);
-        }
-        if (system != null) {
-            return jdbc.queryForList("SELECT * FROM sap_integration_log WHERE system_name=? ORDER BY id DESC", system);
-        }
-        return jdbc.queryForList("SELECT * FROM sap_integration_log ORDER BY id DESC");
+    public List<IntegrationLog> list(String system, String direction) {
+        LambdaQueryWrapper<IntegrationLog> query = new LambdaQueryWrapper<>();
+        if (system != null) query.eq(IntegrationLog::getSystemName, system);
+        if (direction != null) query.eq(IntegrationLog::getDirection, direction);
+        return logs.selectList(query);
     }
 }

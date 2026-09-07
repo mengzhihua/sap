@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import com.sap.common.BaseEntity;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data @TableName("sap_supplier_invoice")
 public class SupplierInvoice extends BaseEntity {
@@ -17,4 +18,6 @@ public class SupplierInvoice extends BaseEntity {
     private String status;
     private String fiBelnr;
     private String matchResult;
+    @TableField(exist = false)
+    private List<SupplierInvoiceItem> items;
 }

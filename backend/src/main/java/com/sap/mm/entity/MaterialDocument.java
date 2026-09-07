@@ -3,6 +3,7 @@ package com.sap.mm.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.sap.common.BaseEntity;
 import lombok.Data;
+import java.util.List;
 
 @Data @TableName("sap_material_document")
 public class MaterialDocument extends BaseEntity {
@@ -13,4 +14,6 @@ public class MaterialDocument extends BaseEntity {
     private String refType;
     private String refNo;
     private String fiBelnr;
+    @TableField(exist = false)
+    private List<MaterialDocumentItem> items;
 }

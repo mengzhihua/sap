@@ -4,7 +4,6 @@ import com.sap.common.R;
 import com.sap.integration.dto.BmsStatementRequest;
 import com.sap.integration.service.BmsStatementService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,13 +13,11 @@ import java.util.Map;
 @RequestMapping("/api/open")
 public class BmsInboundController {
     private final BmsStatementService service;
-    private final JdbcTemplate jdbc;
     private final String apiKey;
 
-    public BmsInboundController(BmsStatementService service, JdbcTemplate jdbc,
+    public BmsInboundController(BmsStatementService service,
                                 @Value("${sap.open.api-key:sap-open-key}") String apiKey) {
         this.service = service;
-        this.jdbc = jdbc;
         this.apiKey = apiKey;
     }
 
@@ -28,16 +25,18 @@ public class BmsInboundController {
     public R<Map<String, Object>> statement(@RequestHeader(value = "X-Api-Key", required = false) String supplied,
                                              @RequestBody BmsStatementRequest body) {
         check(supplied);
-        Map<String, Object> saved = service.post(body);
-        return R.ok(map("belnr", saved.get("belnr"), "gjahr", String.valueOf(java.time.LocalDate.now().getYear()),
-                "statementNo", saved.get("statement_no")));
+        com.sap.integration.entity.BmsStatement saved = service.post(body);
+        return R.ok(map("belnr", saved.getBelnr(), "gjahr", String.valueOf(java.time.LocalDate.now().getYear()),
+                "statementNo", saved.getStatementNo()));
     }
 
     @GetMapping("/bms/statements/{statementNo}")
     public R<Map<String, Object>> get(@RequestHeader(value = "X-Api-Key", required = false) String supplied,
                                       @PathVariable String statementNo) {
         check(supplied);
-        return R.ok(jdbc.queryForMap("SELECT * FROM sap_bms_statement WHERE statement_no=?", statementNo));
+        com.sap.integration.entity.BmsStatement saved = service.find(statementNo);
+        return R.ok(map("belnr", saved.getBelnr(), "gjahr", String.valueOf(java.time.LocalDate.now().getYear()),
+                "statementNo", saved.getStatementNo()));
     }
 
     private void check(String supplied) {

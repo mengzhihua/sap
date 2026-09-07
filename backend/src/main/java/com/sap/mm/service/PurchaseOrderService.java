@@ -1,81 +1,140 @@
 package com.sap.mm.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sap.common.BizException;
 import com.sap.common.NumberRangeService;
 import com.sap.mm.dto.PoCreateRequest;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.sap.mm.entity.PurchaseOrder;
+import com.sap.mm.entity.PurchaseOrderItem;
+import com.sap.mm.mapper.PurchaseOrderItemMapper;
+import com.sap.mm.mapper.PurchaseOrderMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.List;
 
 @Service
 public class PurchaseOrderService {
-    private final JdbcTemplate jdbc;
+    private final PurchaseOrderMapper orders;
+    private final PurchaseOrderItemMapper items;
     private final NumberRangeService numbers;
     private final ReferenceDataService refs;
 
-    public PurchaseOrderService(JdbcTemplate jdbc, NumberRangeService numbers, ReferenceDataService refs) {
-        this.jdbc = jdbc;
+    public PurchaseOrderService(PurchaseOrderMapper orders, PurchaseOrderItemMapper items,
+                                NumberRangeService numbers, ReferenceDataService refs) {
+        this.orders = orders;
+        this.items = items;
         this.numbers = numbers;
         this.refs = refs;
     }
 
     @Transactional
-    public Map<String, Object> create(PoCreateRequest request, String source) {
+    public PurchaseOrder create(PoCreateRequest request, String source) {
         String ebeln = numbers.next("PO");
         String lifnr = refs.vendor(request.getLifnr() == null ? request.getSupplierCode() : request.getLifnr());
-        jdbc.update("INSERT INTO sap_purchase_order(ebeln,bsart,lifnr,ekorg,ekgrp,bukrs,waers,status,external_ref,source,total_amount) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                ebeln, value(request.getBsart(), "NB"), lifnr, value(request.getEkorg(), "1000"),
-                value(request.getEkgrp(), "001"), value(request.getBukrs(), "1000"), value(request.getWaers(), "CNY"),
-                "OPEN", request.getExternalRef(), source, BigDecimal.ZERO);
+        PurchaseOrder order = new PurchaseOrder();
+        order.setEbeln(ebeln);
+        order.setBsart(value(request.getBsart(), "NB"));
+        order.setLifnr(lifnr);
+        order.setEkorg(value(request.getEkorg(), "1000"));
+        order.setEkgrp(value(request.getEkgrp(), "001"));
+        order.setBukrs(value(request.getBukrs(), "1000"));
+        order.setWaers(value(request.getWaers(), "CNY"));
+        order.setStatus("OPEN");
+        order.setExternalRef(request.getExternalRef());
+        order.setSource(source);
+        order.setTotalAmount(BigDecimal.ZERO);
+        orders.insert(order);
+
         BigDecimal total = BigDecimal.ZERO;
         int pos = 10;
-        for (PoCreateRequest.PoItemRequest item : request.getItems()) {
-            String matnr = refs.material(item.getMatnr());
-            String werks = refs.plant(item.getWerks());
-            BigDecimal qty = item.getQty() == null ? item.getMenge() : item.getQty();
-            BigDecimal price = item.getPrice() == null ? item.getNetpr() : item.getPrice();
-            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) throw new BizException("采购数量必须大于0");
+        for (PoCreateRequest.PoItemRequest requestItem : request.getItems()) {
+            String matnr = refs.material(requestItem.getMatnr());
+            String werks = refs.plant(requestItem.getWerks());
+            BigDecimal qty = requestItem.getQty() == null ? requestItem.getMenge() : requestItem.getQty();
+            BigDecimal price = requestItem.getPrice() == null ? requestItem.getNetpr() : requestItem.getPrice();
+            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BizException("采购数量必须大于0");
+            }
             if (price == null) price = BigDecimal.ZERO;
-            jdbc.update("INSERT INTO sap_purchase_order_item(ebeln,ebelp,matnr,werks,lgort,menge,netpr,delivered_qty,invoiced_qty,delivery_date) VALUES(?,?,?,?,?,?,?,0,0,?)",
-                    ebeln, String.valueOf(pos), matnr, werks, value(item.getLgort(), "0001"), qty, price,
-                    item.getDeliveryDate());
+            PurchaseOrderItem item = new PurchaseOrderItem();
+            item.setEbeln(ebeln);
+            item.setEbelp(String.valueOf(pos));
+            item.setMatnr(matnr);
+            item.setWerks(werks);
+            item.setLgort(value(requestItem.getLgort(), "0001"));
+            item.setMenge(qty);
+            item.setNetpr(price);
+            item.setDeliveredQty(BigDecimal.ZERO);
+            item.setInvoicedQty(BigDecimal.ZERO);
+            if (requestItem.getDeliveryDate() != null && !requestItem.getDeliveryDate().isEmpty()) {
+                item.setDeliveryDate(java.time.LocalDate.parse(requestItem.getDeliveryDate()));
+            }
+            items.insert(item);
             total = total.add(qty.multiply(price));
             pos += 10;
         }
-        jdbc.update("UPDATE sap_purchase_order SET total_amount=? WHERE ebeln=?", total, ebeln);
-        return one("SELECT * FROM sap_purchase_order WHERE ebeln=?", ebeln);
+        order.setTotalAmount(total);
+        orders.updateById(order);
+        return load(ebeln);
     }
 
-    public Map<String, Object> find(String input) {
+    public PurchaseOrder find(String input) {
+        PurchaseOrder order = null;
         if (input != null) {
-            List<Map<String, Object>> exact = jdbc.queryForList(
-                    "SELECT * FROM sap_purchase_order WHERE ebeln=? OR external_ref=?", input, input);
-            if (!exact.isEmpty()) return exact.get(0);
+            order = orders.selectOne(new LambdaQueryWrapper<PurchaseOrder>()
+                    .eq(PurchaseOrder::getEbeln, input)
+                    .or().eq(PurchaseOrder::getExternalRef, input));
         }
-        if (input != null && input.startsWith("PO")) {
-            List<Map<String, Object>> fallback = jdbc.queryForList(
-                    "SELECT * FROM sap_purchase_order WHERE source='SRM' AND status IN ('OPEN','PARTIAL') ORDER BY created_at DESC");
-            if (!fallback.isEmpty()) {
-                Map<String, Object> po = fallback.get(0);
-                jdbc.update("UPDATE sap_purchase_order SET external_ref=? WHERE ebeln=?", input, po.get("ebeln"));
-                po.put("external_ref", input);
-                return po;
+        if (order == null && input != null && input.startsWith("PO")) {
+            order = orders.selectList(new LambdaQueryWrapper<PurchaseOrder>()
+                            .eq(PurchaseOrder::getSource, "SRM")
+                            .in(PurchaseOrder::getStatus, "OPEN", "PARTIAL")
+                            .orderByDesc(PurchaseOrder::getEbeln))
+                    .stream().findFirst().orElse(null);
+            if (order != null) {
+                order.setExternalRef(input);
+                orders.updateById(order);
             }
         }
-        throw new BizException("采购订单不存在: " + input);
+        if (order == null) throw new BizException("采购订单不存在: " + input);
+        return load(order.getEbeln());
     }
 
-    public Map<String, Object> item(String ebeln, String matnr, String itemRef) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT * FROM sap_purchase_order_item WHERE ebeln=? AND (matnr=? OR ebelp=?)",
-                ebeln, matnr, itemRef);
-        return rows.isEmpty() ? null : rows.get(0);
+    public PurchaseOrderItem item(String ebeln, String matnr, String itemRef) {
+        return items.selectOne(new LambdaQueryWrapper<PurchaseOrderItem>()
+                .eq(PurchaseOrderItem::getEbeln, ebeln)
+                .and(w -> w.eq(PurchaseOrderItem::getMatnr, matnr)
+                        .or().eq(PurchaseOrderItem::getEbelp, itemRef)));
     }
-    public List<Map<String, Object>> list() { return jdbc.queryForList("SELECT * FROM sap_purchase_order"); }
-    public Map<String, Object> one(String sql, Object... args) { return jdbc.queryForMap(sql, args); }
+
+    public List<PurchaseOrder> list() {
+        List<PurchaseOrder> result = orders.selectList(null);
+        result.forEach(order -> order.setItems(items.selectList(new LambdaQueryWrapper<PurchaseOrderItem>()
+                .eq(PurchaseOrderItem::getEbeln, order.getEbeln()))));
+        return result;
+    }
+
+    public PurchaseOrder one(String ebeln) {
+        PurchaseOrder order = orders.selectById(ebeln);
+        if (order == null) throw new BizException("采购订单不存在: " + ebeln);
+        return load(ebeln);
+    }
+
+    public void updateStatus(PurchaseOrder order) {
+        orders.updateById(order);
+    }
+
+    private PurchaseOrder load(String ebeln) {
+        PurchaseOrder order = orders.selectById(ebeln);
+        if (order != null) {
+            order.setItems(items.selectList(new LambdaQueryWrapper<PurchaseOrderItem>()
+                    .eq(PurchaseOrderItem::getEbeln, ebeln)));
+        }
+        return order;
+    }
+
     private static String value(String value, String fallback) {
         return value == null || value.trim().isEmpty() ? fallback : value;
     }

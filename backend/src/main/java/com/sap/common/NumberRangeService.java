@@ -1,7 +1,9 @@
 package com.sap.common;
 
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sap.basis.entity.NumberRange;
+import com.sap.basis.mapper.NumberRangeMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,10 +12,10 @@ import java.util.Locale;
 
 @Service
 public class NumberRangeService {
-    private final JdbcTemplate jdbc;
+    private final NumberRangeMapper mapper;
 
-    public NumberRangeService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public NumberRangeService(NumberRangeMapper mapper) {
+        this.mapper = mapper;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -24,17 +26,24 @@ public class NumberRangeService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String next(String object, String requestedPrefix) {
         String prefix = requestedPrefix == null ? defaultPrefix(object) : requestedPrefix;
-        int updated = jdbc.update("UPDATE sap_number_range SET current_no=current_no+1 WHERE object_name=?", object);
-        if (updated == 0) {
+        NumberRange range = mapper.selectOne(new LambdaQueryWrapper<NumberRange>()
+                .eq(NumberRange::getObjectName, object));
+        if (range == null) {
             try {
-                jdbc.update("INSERT INTO sap_number_range(object_name,prefix,current_no) VALUES(?,?,1)",
-                        object, prefix);
+                range = new NumberRange();
+                range.setObjectName(object);
+                range.setPrefix(prefix);
+                range.setCurrentNo(1);
+                mapper.insert(range);
             } catch (DuplicateKeyException e) {
-                jdbc.update("UPDATE sap_number_range SET current_no=current_no+1 WHERE object_name=?", object);
+                range = mapper.selectOne(new LambdaQueryWrapper<NumberRange>()
+                        .eq(NumberRange::getObjectName, object));
             }
+        } else {
+            range.setCurrentNo(range.getCurrentNo() + 1);
+            mapper.updateById(range);
         }
-        Integer n = jdbc.queryForObject("SELECT current_no FROM sap_number_range WHERE object_name=?",
-                Integer.class, object);
+        Integer n = range == null ? 1 : range.getCurrentNo();
         return prefix + String.format(Locale.ROOT, "%08d", n == null ? 1 : n);
     }
 
