@@ -27,8 +27,8 @@ public class IntegrationLogService {
 
     public List<IntegrationLog> list(String system, String direction) {
         LambdaQueryWrapper<IntegrationLog> query = new LambdaQueryWrapper<>();
-        if (system != null) query.eq(IntegrationLog::getSystemName, system);
-        if (direction != null) query.eq(IntegrationLog::getDirection, direction);
+        if (system != null && !system.trim().isEmpty()) query.eq(IntegrationLog::getSystemName, system);
+        if (direction != null && !direction.trim().isEmpty()) query.eq(IntegrationLog::getDirection, direction);
         return logs.selectList(query);
     }
 

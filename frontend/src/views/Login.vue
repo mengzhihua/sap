@@ -20,7 +20,7 @@ const form = reactive({ username: 'admin', password: 'admin123' })
 const loading = ref(false); const router = useRouter(); const route = useRoute()
 async function submit() {
   loading.value = true
-  try { const data = await authApi.login(form); setAuth(data.token, data.user); router.replace(route.query.redirect || '/dashboard') }
+  try { const data = await authApi.login(form); setAuth(data.token, data.user); router.replace(route.query.redirect || '/launchpad') }
   catch (e) { ElMessage.error(e.message || '登录失败') } finally { loading.value = false }
 }
 </script>
