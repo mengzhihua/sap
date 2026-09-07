@@ -1,4 +1,48 @@
-<template><PageShell title="库存总览" tcode="MMBE"><el-card><div class="toolbar"><el-input v-model="filters.matnr" placeholder="物料号" clearable /><el-input v-model="filters.werks" placeholder="工厂" clearable /><el-button type="primary" @click="load">查询</el-button></div><el-table :data="rows" border stripe><el-table-column prop="matnr" label="物料" /><el-table-column prop="werks" label="工厂" /><el-table-column prop="lgort" label="库存地点" /><el-table-column prop="unrestrictedQty" label="非限制库存" /><el-table-column prop="value" label="库存价值" /></el-table></el-card></PageShell></template>
+<template>
+  <PageShell
+    title="库存总览"
+    tcode="MMBE"
+    ><el-card
+      ><div class="toolbar">
+        <el-input
+          v-model="filters.matnr"
+          placeholder="物料号"
+          clearable
+        /><el-input
+          v-model="filters.werks"
+          placeholder="工厂"
+          clearable
+        /><el-button
+          type="primary"
+          @click="load"
+          >查询</el-button
+        >
+      </div>
+      <el-table
+        :data="rows"
+        border
+        stripe
+        ><el-table-column
+          prop="matnr"
+          label="物料" /><el-table-column
+          prop="werks"
+          label="工厂" /><el-table-column
+          prop="lgort"
+          label="库存地点" /><el-table-column
+          prop="unrestrictedQty"
+          label="非限制库存" /><el-table-column
+          prop="value"
+          label="库存价值" /></el-table></el-card
+  ></PageShell>
+</template>
 <script setup>
-import { onMounted, reactive, ref } from 'vue'; import PageShell from '../../components/PageShell.vue'; import { mmApi } from '../../api'; const filters=reactive({matnr:'',werks:''}),rows=ref([]);async function load(){rows.value=await mmApi.stock(filters)};onMounted(load)
+import { onMounted, reactive, ref } from 'vue'
+import PageShell from '../../components/PageShell.vue'
+import { mmApi } from '../../api'
+const filters = reactive({ matnr: '', werks: '' })
+const rows = ref([])
+async function load() {
+  rows.value = await mmApi.stock(filters)
+}
+onMounted(load)
 </script>

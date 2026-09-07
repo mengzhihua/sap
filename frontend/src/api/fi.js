@@ -14,5 +14,5 @@ export const fiApi = {
   ap: (params) => http.get('/fi/ap/open-items', { params }),
   ar: (params) => http.get('/fi/ar/open-items', { params }),
   determination: () => http.get('/fi/account-determination'),
-  updateDetermination: (data) => http.put('/fi/account-determination', data)
+  updateDetermination: (data) => http.put('/fi/account-determination', data),
 }

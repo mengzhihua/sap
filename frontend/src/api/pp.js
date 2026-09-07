@@ -7,5 +7,5 @@ export const ppApi = {
   orders: () => http.get('/pp/orders'),
   order: (id) => http.get(`/pp/orders/${id}`),
   createOrder: (data) => http.post('/pp/orders', data),
-  action: (id, action, params) => http.post(`/pp/orders/${id}/${action}`, null, { params })
+  action: (id, action, params) => http.post(`/pp/orders/${id}/${action}`, null, { params }),
 }

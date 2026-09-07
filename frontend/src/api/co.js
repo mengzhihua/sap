@@ -5,5 +5,5 @@ export const coApi = {
   createCenter: (data) => http.post('/co/cost-centers', data),
   updateCenter: (id, data) => http.put(`/co/cost-centers/${id}`, data),
   documents: (params) => http.get('/co/documents', { params }),
-  report: () => http.get('/co/report')
+  report: () => http.get('/co/report'),
 }

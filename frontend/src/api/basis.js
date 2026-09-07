@@ -9,5 +9,5 @@ export const basisApi = {
   org: (kind) => http.get(`/basis/org/${kind}`),
   createOrg: (kind, data) => http.post(`/basis/org/${kind}`, data),
   tcodes: (q) => http.get('/basis/tcodes', { params: { q } }),
-  logs: (params) => http.get('/basis/op-logs', { params })
+  logs: (params) => http.get('/basis/op-logs', { params }),
 }

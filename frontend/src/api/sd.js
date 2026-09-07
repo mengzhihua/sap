@@ -15,5 +15,5 @@ export const sdApi = {
   billings: () => http.get('/sd/billing'),
   billing: (id) => http.get(`/sd/billing/${id}`),
   createBilling: (data) => http.post('/sd/billing', data),
-  repush: (id) => http.post(`/integration/bms/deliveries/${id}/push`)
+  repush: (id) => http.post(`/integration/bms/deliveries/${id}/push`),
 }

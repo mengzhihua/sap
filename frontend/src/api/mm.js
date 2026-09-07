@@ -24,5 +24,5 @@ export const mmApi = {
   invoices: () => http.get('/mm/supplier-invoices'),
   invoice: (id) => http.get(`/mm/supplier-invoices/${id}`),
   grir: () => http.get('/mm/gr-ir'),
-  evaluations: () => http.get('/mm/vendor-evaluations')
+  evaluations: () => http.get('/mm/vendor-evaluations'),
 }
