@@ -1,0 +1,22 @@
+html, body, #app { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif; background: #f3f5f7; color: #243447; }
+.shell { height: 100%; }
+.topbar { height: 60px; display: flex; align-items: center; gap: 28px; background: #354a5f; color: #fff; padding: 0 24px; }
+.brand { font-size: 20px; font-weight: 700; min-width: 210px; }
+.command { width: 380px; }
+.user { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.sidebar { background: #1f3548; overflow: auto; }
+.content { padding: 22px 26px; overflow: auto; }
+.crumb { color: #687b8c; border-bottom: 1px solid #d9e2ec; padding-bottom: 14px; margin-bottom: 18px; }
+.page-head { display: flex; justify-content: space-between; align-items: center; }
+.tile-group { margin: 22px 0; }
+.tile { cursor: pointer; min-height: 84px; display: flex; flex-direction: column; justify-content: center; }
+.tile b { color: #0a6ed1; font-size: 18px; }
+.tile span { margin-top: 8px; }
+.stats strong { font-size: 25px; display: block; margin-top: 8px; }
+.muted { color: #738496; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
+.toolbar .el-input { max-width: 280px; }
+.login-page { height: 100%; display: grid; place-items: center; background: linear-gradient(135deg, #354a5f, #0a6ed1); }
+.login-card { width: 380px; padding: 16px; }
+.login-card h1 { margin-bottom: 4px; }.login-card p { color: #8492a6; }.wide { width: 100%; }
+pre { white-space: pre-wrap; background: #f6f8fa; padding: 16px; border-radius: 4px; }
