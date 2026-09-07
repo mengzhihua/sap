@@ -6,6 +6,7 @@ import com.sap.integration.mapper.IntegrationLogMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import com.sap.common.PageResult;
 
 @Service
 public class IntegrationLogService {
@@ -29,5 +30,18 @@ public class IntegrationLogService {
         if (system != null) query.eq(IntegrationLog::getSystemName, system);
         if (direction != null) query.eq(IntegrationLog::getDirection, direction);
         return logs.selectList(query);
+    }
+
+    public PageResult<IntegrationLog> page(String system, String direction, long page, long size) {
+        List<IntegrationLog> all = list(system, direction);
+        long from = Math.max(0, (page - 1) * size);
+        long to = Math.min(all.size(), from + size);
+        List<IntegrationLog> records = from >= all.size() ? java.util.Collections.<IntegrationLog>emptyList()
+                : all.subList((int) from, (int) to);
+        return new PageResult<>(all.size(), page, size, records);
+    }
+
+    public IntegrationLog one(Long id) {
+        return logs.selectById(id);
     }
 }

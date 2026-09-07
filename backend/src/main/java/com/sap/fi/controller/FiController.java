@@ -14,6 +14,7 @@ import javax.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @RestController
@@ -25,20 +26,39 @@ public class FiController {
     private final AccountingDocumentMapper documents;
     private final AccountingDocumentItemMapper items;
     private final AccountDeterminationMapper determination;
+    private final PaymentMapper payments;
 
     public FiController(JdbcTemplate jdbc, AccountingDocumentService accounting, GlAccountMapper accounts,
                         AccountingDocumentMapper documents, AccountingDocumentItemMapper items,
-                        AccountDeterminationMapper determination) {
+                        AccountDeterminationMapper determination, PaymentMapper payments) {
         this.jdbc = jdbc; this.accounting = accounting; this.accounts = accounts;
         this.documents = documents; this.items = items; this.determination = determination;
+        this.payments = payments;
     }
 
     @GetMapping("/gl-accounts")
     public R<PageResult<GlAccount>> accounts(@RequestParam(required = false) String q,
                                              @RequestParam(defaultValue = "1") long page,
                                              @RequestParam(defaultValue = "20") long size) {
-        List<GlAccount> all = accounts.selectList(null);
+        LambdaQueryWrapper<GlAccount> query = new LambdaQueryWrapper<>();
+        if (q != null && !q.trim().isEmpty()) {
+            query.like(GlAccount::getSaknr, q).or().like(GlAccount::getTxt, q);
+        }
+        List<GlAccount> all = accounts.selectList(query);
         return R.ok(page(all, page, size));
+    }
+
+    @PostMapping("/gl-accounts")
+    public R<GlAccount> createAccount(@RequestBody GlAccount account) {
+        accounts.insert(account);
+        return R.ok(account);
+    }
+
+    @PutMapping("/gl-accounts/{saknr}")
+    public R<GlAccount> updateAccount(@PathVariable String saknr, @RequestBody GlAccount input) {
+        input.setSaknr(saknr);
+        accounts.updateById(input);
+        return R.ok(accounts.selectById(saknr));
     }
 
     @PostMapping("/documents")
@@ -92,6 +112,26 @@ public class FiController {
 
     @GetMapping("/account-determination")
     public R<List<AccountDetermination>> determination() { return R.ok(determination.selectList(null)); }
+
+    @PutMapping("/account-determination")
+    public R<List<AccountDetermination>> updateDetermination(
+            @RequestBody List<AccountDeterminationRequest> request) {
+        List<AccountDetermination> result = new ArrayList<>();
+        for (AccountDeterminationRequest input : request) {
+            AccountDetermination value = new AccountDetermination();
+            value.setAccountKey(input.getKey());
+            value.setSaknr(input.getSaknr());
+            if (determination.selectById(input.getKey()) == null) determination.insert(value);
+            else determination.updateById(value);
+            result.add(value);
+        }
+        return R.ok(result);
+    }
+
+    @GetMapping("/payments")
+    public R<List<Payment>> payments() {
+        return R.ok(payments.selectList(null));
+    }
 
     private List<AccountingDocumentItem> openItems(String account, String partner, boolean ap) {
         List<AccountingDocument> all = documents.selectList(new LambdaQueryWrapper<AccountingDocument>()

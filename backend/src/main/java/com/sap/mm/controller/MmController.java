@@ -7,6 +7,8 @@ import com.sap.mm.dto.*;
 import com.sap.mm.entity.*;
 import com.sap.mm.mapper.*;
 import com.sap.mm.service.*;
+import com.sap.integration.entity.VendorEvaluation;
+import com.sap.integration.mapper.VendorEvaluationMapper;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,16 +30,19 @@ public class MmController {
     private final SupplierInvoiceMapper supplierInvoices;
     private final SupplierInvoiceItemMapper supplierInvoiceItems;
     private final GrIrMapper grIr;
+    private final PurchaseReqService purchaseReqs;
+    private final VendorEvaluationMapper evaluations;
 
     public MmController(PurchaseOrderService pos, GoodsMovementService goods, InvoiceVerificationService invoices,
                         MaterialMapper materials, VendorMapper vendors, MaterialDocumentMapper materialDocuments,
                         MaterialDocumentItemMapper materialDocumentItems, StockMapper stocks,
                         SupplierInvoiceMapper supplierInvoices, SupplierInvoiceItemMapper supplierInvoiceItems,
-                        GrIrMapper grIr) {
+                        GrIrMapper grIr, PurchaseReqService purchaseReqs, VendorEvaluationMapper evaluations) {
         this.pos = pos; this.goods = goods; this.invoices = invoices; this.materials = materials;
         this.vendors = vendors; this.materialDocuments = materialDocuments;
         this.materialDocumentItems = materialDocumentItems; this.stocks = stocks;
         this.supplierInvoices = supplierInvoices; this.supplierInvoiceItems = supplierInvoiceItems; this.grIr = grIr;
+        this.purchaseReqs = purchaseReqs; this.evaluations = evaluations;
     }
 
     @GetMapping("/materials")
@@ -58,6 +63,66 @@ public class MmController {
         if (q != null && !q.trim().isEmpty()) query.and(w -> w.like(Vendor::getLifnr, q)
                 .or().like(Vendor::getAliasCode, q).or().like(Vendor::getName, q));
         return R.ok(page(vendors.selectList(query), page, size));
+    }
+
+    @PostMapping("/materials")
+    public R<Material> createMaterial(@RequestBody Material material) {
+        materials.insert(material);
+        return R.ok(material);
+    }
+
+    @PutMapping("/materials/{matnr}")
+    public R<Material> updateMaterial(@PathVariable String matnr, @RequestBody Material input) {
+        input.setMatnr(matnr);
+        materials.updateById(input);
+        return R.ok(materials.selectById(matnr));
+    }
+
+    @GetMapping("/materials/{matnr}")
+    public R<Material> material(@PathVariable String matnr) {
+        return R.ok(materials.selectById(matnr));
+    }
+
+    @PostMapping("/vendors")
+    public R<Vendor> createVendor(@RequestBody Vendor vendor) {
+        if (vendors.selectById(vendor.getLifnr()) == null) {
+            vendors.insert(vendor);
+        } else {
+            vendors.updateById(vendor);
+        }
+        return R.ok(vendors.selectById(vendor.getLifnr()));
+    }
+
+    @PutMapping("/vendors/{lifnr}")
+    public R<Vendor> updateVendor(@PathVariable String lifnr, @RequestBody Vendor input) {
+        input.setLifnr(lifnr);
+        vendors.updateById(input);
+        return R.ok(vendors.selectById(lifnr));
+    }
+
+    @GetMapping("/vendors/{lifnr}")
+    public R<Vendor> vendor(@PathVariable String lifnr) {
+        return R.ok(vendors.selectById(lifnr));
+    }
+
+    @PostMapping("/pr")
+    public R<PurchaseReq> createPr(@Valid @RequestBody PurchaseReqRequest request) {
+        return R.ok(purchaseReqs.create(request));
+    }
+
+    @GetMapping("/pr")
+    public R<List<PurchaseReq>> prs() {
+        return R.ok(purchaseReqs.list());
+    }
+
+    @GetMapping("/pr/{banfn}")
+    public R<PurchaseReq> pr(@PathVariable String banfn) {
+        return R.ok(purchaseReqs.one(banfn));
+    }
+
+    @PostMapping("/pr/{banfn}/release")
+    public R<PurchaseReq> releasePr(@PathVariable String banfn) {
+        return R.ok(purchaseReqs.release(banfn));
     }
 
     @PostMapping("/po")
@@ -86,6 +151,17 @@ public class MmController {
         return R.ok(result);
     }
 
+    @GetMapping("/material-docs/{mblnr}")
+    public R<MaterialDocument> doc(@PathVariable String mblnr) {
+        MaterialDocument result = materialDocuments.selectById(mblnr);
+        if (result == null) {
+            throw new com.sap.common.BizException("物料凭证不存在: " + mblnr);
+        }
+        result.setItems(materialDocumentItems.selectList(new LambdaQueryWrapper<MaterialDocumentItem>()
+                .eq(MaterialDocumentItem::getMblnr, mblnr)));
+        return R.ok(result);
+    }
+
     @GetMapping("/stock")
     public R<List<Stock>> stock(@RequestParam(required = false) String matnr,
                                 @RequestParam(required = false) String werks) {
@@ -104,6 +180,22 @@ public class MmController {
         result.forEach(invoice -> invoice.setItems(supplierInvoiceItems.selectList(
                 new LambdaQueryWrapper<SupplierInvoiceItem>().eq(SupplierInvoiceItem::getBelnr, invoice.getBelnr()))));
         return R.ok(result);
+    }
+
+    @GetMapping("/supplier-invoices/{belnr}")
+    public R<SupplierInvoice> invoice(@PathVariable String belnr) {
+        SupplierInvoice result = supplierInvoices.selectById(belnr);
+        if (result == null) {
+            throw new com.sap.common.BizException("供应商发票不存在: " + belnr);
+        }
+        result.setItems(supplierInvoiceItems.selectList(new LambdaQueryWrapper<SupplierInvoiceItem>()
+                .eq(SupplierInvoiceItem::getBelnr, belnr)));
+        return R.ok(result);
+    }
+
+    @GetMapping("/vendor-evaluations")
+    public R<List<VendorEvaluation>> evaluations() {
+        return R.ok(evaluations.selectList(null));
     }
 
     @GetMapping("/gr-ir")

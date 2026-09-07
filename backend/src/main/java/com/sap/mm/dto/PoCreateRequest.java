@@ -10,14 +10,15 @@ import java.util.List;
 @Data
 public class PoCreateRequest {
     private String bsart = "NB";
-    @NotBlank private String supplierCode;
+    private String supplierCode;
     private String lifnr;
     private String ekorg = "1000";
     private String ekgrp = "001";
     private String bukrs = "1000";
     private String waers = "CNY";
     private String externalRef;
-    @NotEmpty @Valid private List<PoItemRequest> items;
+    private String prBanfn;
+    @Valid private List<PoItemRequest> items;
     @Data public static class PoItemRequest {
         @NotBlank private String matnr;
         @NotBlank private String werks;

@@ -129,6 +129,28 @@ public class DeliveryService {
 
     public Delivery one(String id) { return load(require(id)); }
 
+    @Transactional
+    public Delivery repush(String id) {
+        Delivery delivery = require(id);
+        List<DeliveryItem> lines = deliveryItems.selectList(new LambdaQueryWrapper<DeliveryItem>()
+                .eq(DeliveryItem::getVbeln, id));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("extRef", id);
+        payload.put("bizType", "OUTBOUND");
+        payload.put("customerCode", refs.alias("sap_customer", "kunnr", delivery.getKunnr()));
+        payload.put("warehouseCode", "WH-" + delivery.getWerks());
+        payload.put("bizDate", LocalDate.now().toString());
+        payload.put("orders", 1);
+        payload.put("lines", lines.size());
+        payload.put("qty", lines.stream().map(DeliveryItem::getQty).filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        Map<String, Object> pushed = bms.push("/api/open/oms/docs", payload);
+        delivery.setBmsSynced(1);
+        delivery.setBmsDocNo(pushed.get("docNo") == null ? null : String.valueOf(pushed.get("docNo")));
+        deliveries.updateById(delivery);
+        return load(delivery);
+    }
+
     private Delivery require(String id) {
         Delivery delivery = deliveries.selectById(id);
         if (delivery == null) throw new BizException("交货单不存在: " + id);

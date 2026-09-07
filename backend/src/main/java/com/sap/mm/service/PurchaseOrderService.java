@@ -6,12 +6,17 @@ import com.sap.common.NumberRangeService;
 import com.sap.mm.dto.PoCreateRequest;
 import com.sap.mm.entity.PurchaseOrder;
 import com.sap.mm.entity.PurchaseOrderItem;
+import com.sap.mm.entity.PurchaseReq;
+import com.sap.mm.entity.PurchaseReqItem;
 import com.sap.mm.mapper.PurchaseOrderItemMapper;
 import com.sap.mm.mapper.PurchaseOrderMapper;
+import com.sap.mm.mapper.PurchaseReqItemMapper;
+import com.sap.mm.mapper.PurchaseReqMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -20,19 +25,26 @@ public class PurchaseOrderService {
     private final PurchaseOrderItemMapper items;
     private final NumberRangeService numbers;
     private final ReferenceDataService refs;
+    private final PurchaseReqMapper requests;
+    private final PurchaseReqItemMapper requestItems;
 
     public PurchaseOrderService(PurchaseOrderMapper orders, PurchaseOrderItemMapper items,
-                                NumberRangeService numbers, ReferenceDataService refs) {
+                                NumberRangeService numbers, ReferenceDataService refs,
+                                PurchaseReqMapper requests, PurchaseReqItemMapper requestItems) {
         this.orders = orders;
         this.items = items;
         this.numbers = numbers;
         this.refs = refs;
+        this.requests = requests;
+        this.requestItems = requestItems;
     }
 
     @Transactional
     public PurchaseOrder create(PoCreateRequest request, String source) {
         String ebeln = numbers.next("PO");
-        String lifnr = refs.vendor(request.getLifnr() == null ? request.getSupplierCode() : request.getLifnr());
+        String supplier = request.getLifnr() == null ? request.getSupplierCode() : request.getLifnr();
+        if (supplier == null || supplier.trim().isEmpty()) throw new BizException("供应商不能为空");
+        String lifnr = refs.vendor(supplier);
         PurchaseOrder order = new PurchaseOrder();
         order.setEbeln(ebeln);
         order.setBsart(value(request.getBsart(), "NB"));
@@ -49,7 +61,23 @@ public class PurchaseOrderService {
 
         BigDecimal total = BigDecimal.ZERO;
         int pos = 10;
-        for (PoCreateRequest.PoItemRequest requestItem : request.getItems()) {
+        List<PoCreateRequest.PoItemRequest> inputItems = request.getItems();
+        if ((inputItems == null || inputItems.isEmpty()) && request.getPrBanfn() != null) {
+            inputItems = new ArrayList<>();
+            List<PurchaseReqItem> prItems = requestItems.selectList(new LambdaQueryWrapper<PurchaseReqItem>()
+                    .eq(PurchaseReqItem::getBanfn, request.getPrBanfn()));
+            for (PurchaseReqItem prItem : prItems) {
+                PoCreateRequest.PoItemRequest poItem = new PoCreateRequest.PoItemRequest();
+                poItem.setMatnr(prItem.getMatnr());
+                poItem.setWerks(prItem.getWerks());
+                poItem.setLgort(prItem.getLgort());
+                poItem.setQty(prItem.getMenge());
+                poItem.setPrice(prItem.getNetpr());
+                inputItems.add(poItem);
+            }
+        }
+        if (inputItems == null || inputItems.isEmpty()) throw new BizException("采购订单至少需要一行");
+        for (PoCreateRequest.PoItemRequest requestItem : inputItems) {
             String matnr = refs.material(requestItem.getMatnr());
             String werks = refs.plant(requestItem.getWerks());
             BigDecimal qty = requestItem.getQty() == null ? requestItem.getMenge() : requestItem.getQty();
@@ -77,6 +105,13 @@ public class PurchaseOrderService {
         }
         order.setTotalAmount(total);
         orders.updateById(order);
+        if (request.getPrBanfn() != null) {
+            PurchaseReq pr = requests.selectOne(new LambdaQueryWrapper<PurchaseReq>()
+                    .eq(PurchaseReq::getBanfn, request.getPrBanfn()));
+            if (pr == null) throw new BizException("采购申请不存在: " + request.getPrBanfn());
+            pr.setStatus("ORDERED");
+            requests.updateById(pr);
+        }
         return load(ebeln);
     }
 
