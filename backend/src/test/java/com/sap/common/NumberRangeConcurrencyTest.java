@@ -50,4 +50,35 @@ public class NumberRangeConcurrencyTest extends TestSupport {
             ranges.deleteById(object);
         }
     }
+
+    @Test
+    void allocatesFirstNumbersForBrandNewObjectUnderConcurrency() throws Exception {
+        final String object = "N-" + UUID.randomUUID().toString().replace("-", "").substring(0, 24);
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        List<Future<String>> futures = new ArrayList<>();
+        try {
+            ranges.deleteById(object);
+            for (int i = 0; i < 8; i++) {
+                futures.add(executor.submit(new Callable<String>() {
+                    @Override
+                    public String call() {
+                        return numbers.next(object, "N");
+                    }
+                }));
+            }
+
+            Set<String> values = new HashSet<>();
+            for (Future<String> future : futures) {
+                values.add(future.get());
+            }
+            assertEquals(8, values.size());
+            for (int i = 1; i <= 8; i++) {
+                assertTrue(values.contains("N" + String.format("%08d", i)));
+            }
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+            ranges.deleteById(object);
+        }
+    }
 }
