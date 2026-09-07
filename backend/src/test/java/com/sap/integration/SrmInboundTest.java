@@ -16,6 +16,14 @@ public class SrmInboundTest extends TestSupport {
     private MockMvc mvc;
 
     @Test
+    void srmRejectsMissingBasicAuth() throws Exception {
+        mvc.perform(post("/API_PURCHASEORDER_PROCESS_SRV/A_PurchaseOrder")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("SAP_AUTH_ERROR"));
+    }
+
+    @Test
     void srmBasicAuthAliasAndFakePoFallbackWork() throws Exception {
         String basic = "Basic " + java.util.Base64.getEncoder().encodeToString("srm:srm123".getBytes("UTF-8"));
         String po = "{\"PurchaseOrderType\":\"NB\",\"Supplier\":\"SUP01\",\"PurchasingOrganization\":\"1000\",\"PurchasingGroup\":\"001\",\"CompanyCode\":\"1000\",\"DocumentCurrency\":\"CNY\",\"to_PurchaseOrderItem\":[{\"Material\":\"SKU001\",\"OrderQuantity\":2,\"NetPriceAmount\":45,\"Plant\":\"P001\"}]}";

@@ -1,8 +1,8 @@
 package com.sap.integration.controller;
 
-import com.sap.common.BizException;
+import com.sap.integration.dto.*;
 import com.sap.integration.service.IntegrationLogService;
-import com.sap.integration.service.SapBusinessService;
+import com.sap.integration.service.SrmInboundService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -12,12 +12,12 @@ import java.util.Map;
 
 @RestController
 public class SrmInboundController {
-    private final SapBusinessService service;
+    private final SrmInboundService service;
     private final IntegrationLogService logs;
     private final String username;
     private final String password;
 
-    public SrmInboundController(SapBusinessService service, IntegrationLogService logs,
+    public SrmInboundController(SrmInboundService service, IntegrationLogService logs,
                                 @Value("${sap.srm.username:srm}") String username,
                                 @Value("${sap.srm.password:srm123}") String password) {
         this.service = service;
@@ -28,11 +28,11 @@ public class SrmInboundController {
 
     @PostMapping("/API_PURCHASEORDER_PROCESS_SRV/A_PurchaseOrder")
     public ResponseEntity<?> purchaseOrder(@RequestHeader(value = "Authorization", required = false) String auth,
-                                           @RequestBody Map<String, Object> body) {
+                                           @RequestBody SrmPurchaseOrderPayload body) {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            Map<String, Object> po = service.createPo(body, "SRM");
+            Map<String, Object> po = service.po(body);
             Map<String, Object> d = new HashMap<>();
             d.put("PurchaseOrder", po.get("ebeln"));
             log("SRM_CREATE_PO", body, d, true, null, start);
@@ -45,11 +45,11 @@ public class SrmInboundController {
 
     @PostMapping("/API_MATERIAL_DOCUMENT_SRV/A_MaterialDocumentHeader")
     public ResponseEntity<?> material(@RequestHeader(value = "Authorization", required = false) String auth,
-                                      @RequestBody Map<String, Object> body) {
+                                      @RequestBody SrmGoodsReceiptPayload body) {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            Map<String, Object> doc = service.receivePo(body);
+            Map<String, Object> doc = service.gr(body);
             Map<String, Object> d = new HashMap<>();
             d.put("MaterialDocument", doc.get("mblnr"));
             d.put("MaterialDocumentYear", doc.get("mjahr"));
@@ -63,11 +63,11 @@ public class SrmInboundController {
 
     @PostMapping("/API_SUPPLIERINVOICE_PROCESS_SRV/A_SupplierInvoice")
     public ResponseEntity<?> invoice(@RequestHeader(value = "Authorization", required = false) String auth,
-                                     @RequestBody Map<String, Object> body) {
+                                     @RequestBody SrmInvoicePayload body) {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            Map<String, Object> inv = service.postMiro(body);
+            Map<String, Object> inv = service.invoice(body);
             Map<String, Object> d = new HashMap<>();
             d.put("SupplierInvoice", inv.get("belnr"));
             d.put("FiscalYear", inv.get("gjahr"));
@@ -81,11 +81,11 @@ public class SrmInboundController {
 
     @PostMapping("/API_SUPPLIER_EVALUATION_SRV/A_SupplierEvaluation")
     public ResponseEntity<?> evaluation(@RequestHeader(value = "Authorization", required = false) String auth,
-                                        @RequestBody Map<String, Object> body) {
+                                        @RequestBody SrmEvaluationPayload body) {
         check(auth);
         long start = System.currentTimeMillis();
         try {
-            String evaluationId = service.saveEvaluation(body);
+            String evaluationId = service.evaluation(body);
             Map<String, Object> result = new HashMap<>();
             result.put("EvaluationId", evaluationId);
             logs.write("IN", "SRM", "SRM_SYNC_EVAL", body, result, true, null, System.currentTimeMillis() - start);

@@ -1,8 +1,8 @@
 package com.sap.integration.controller;
 
-import com.sap.common.BizException;
 import com.sap.common.R;
-import com.sap.integration.service.SapBusinessService;
+import com.sap.integration.dto.BmsStatementRequest;
+import com.sap.integration.service.BmsStatementService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -13,11 +13,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/open")
 public class BmsInboundController {
-    private final SapBusinessService service;
+    private final BmsStatementService service;
     private final JdbcTemplate jdbc;
     private final String apiKey;
 
-    public BmsInboundController(SapBusinessService service, JdbcTemplate jdbc,
+    public BmsInboundController(BmsStatementService service, JdbcTemplate jdbc,
                                 @Value("${sap.open.api-key:sap-open-key}") String apiKey) {
         this.service = service;
         this.jdbc = jdbc;
@@ -26,9 +26,9 @@ public class BmsInboundController {
 
     @PostMapping("/bms/statements")
     public R<Map<String, Object>> statement(@RequestHeader(value = "X-Api-Key", required = false) String supplied,
-                                             @RequestBody Map<String, Object> body) {
+                                             @RequestBody BmsStatementRequest body) {
         check(supplied);
-        Map<String, Object> saved = service.createStatement(body);
+        Map<String, Object> saved = service.post(body);
         return R.ok(map("belnr", saved.get("belnr"), "gjahr", String.valueOf(java.time.LocalDate.now().getYear()),
                 "statementNo", saved.get("statement_no")));
     }
