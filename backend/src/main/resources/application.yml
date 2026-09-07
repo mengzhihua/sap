@@ -1,0 +1,46 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: sap-backend
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:sap}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+      continue-on-error: false
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+sap:
+  auth:
+    secret: ${SAP_AUTH_SECRET:}
+    token-ttl: ${SAP_TOKEN_TTL:12h}
+    admin-password: ${SAP_ADMIN_PASSWORD:admin123}
+  srm:
+    username: ${SAP_SRM_USERNAME:srm}
+    password: ${SAP_SRM_PASSWORD:srm123}
+  open:
+    api-key: ${SAP_OPEN_API_KEY:sap-open-key}
+  bms:
+    mode: ${SAP_BMS_MODE:mock}
+    base-url: ${SAP_BMS_BASE_URL:http://localhost:8080}
+    api-key: ${SAP_BMS_API_KEY:dev-open-key}
+    customer-code: ${SAP_BMS_CUSTOMER_CODE:CUST-001}
+logging:
+  level:
+    com.sap: info
