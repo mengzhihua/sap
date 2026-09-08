@@ -88,6 +88,11 @@ CREATE TABLE IF NOT EXISTS sap_acc_document (id BIGINT AUTO_INCREMENT PRIMARY KE
 CREATE TABLE IF NOT EXISTS sap_acc_document_item (id BIGINT AUTO_INCREMENT PRIMARY KEY, belnr VARCHAR(64), buzei VARCHAR(16), bschl VARCHAR(8), shkzg VARCHAR(1), saknr VARCHAR(32), lifnr VARCHAR(64), kunnr VARCHAR(64), kostl VARCHAR(32), amount DECIMAL(18,2), text VARCHAR(255));
 CREATE TABLE IF NOT EXISTS sap_payment (id BIGINT AUTO_INCREMENT PRIMARY KEY, type VARCHAR(8), partner VARCHAR(64), amount DECIMAL(18,2), belnr VARCHAR(64), cleared_docs VARCHAR(1000), created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sap_account_determination (account_key VARCHAR(32) PRIMARY KEY, saknr VARCHAR(32));
+CREATE TABLE IF NOT EXISTS sap_posting_period (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, bukrs VARCHAR(16) NOT NULL, fiscal_year INT NOT NULL,
+  from_period INT NOT NULL, to_period INT NOT NULL, open INT NOT NULL DEFAULT 1,
+  UNIQUE(bukrs,fiscal_year,from_period,to_period)
+);
 
 CREATE TABLE IF NOT EXISTS sap_cost_center (kostl VARCHAR(32) PRIMARY KEY, name VARCHAR(128), bukrs VARCHAR(16), responsible VARCHAR(128));
 CREATE TABLE IF NOT EXISTS sap_co_document (id BIGINT AUTO_INCREMENT PRIMARY KEY, fi_belnr VARCHAR(64), kostl VARCHAR(32), cost_element VARCHAR(32), amount DECIMAL(18,2), budat DATE, text VARCHAR(255));

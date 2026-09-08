@@ -11,6 +11,9 @@
         <el-form-item label="凭证类型">
           <el-input v-model="form.blart" />
         </el-form-item>
+        <el-form-item label="公司代码">
+          <el-input v-model="form.bukrs" />
+        </el-form-item>
         <el-form-item label="过账日期">
           <el-date-picker
             v-model="form.budat"
@@ -19,7 +22,10 @@
           />
         </el-form-item>
         <el-form-item label="抬头文本">
-          <el-input v-model="form.text" />
+          <el-input v-model="form.headerText" />
+        </el-form-item>
+        <el-form-item label="参考号">
+          <el-input v-model="form.refNo" />
         </el-form-item>
       </el-form>
 
@@ -187,13 +193,22 @@ import { sdApi } from '../../api/sd'
 
 const form = reactive({
   blart: 'SA',
-  budat: '',
-  text: '',
+  bukrs: '1000',
+  waers: 'CNY',
+  budat: localDate(),
+  headerText: '',
+  refNo: '',
   items: [
     { saknr: '1001', shkzg: 'S', amount: 0 },
     { saknr: '4001', shkzg: 'H', amount: 0 },
   ],
 })
+
+function localDate() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60 * 1000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
 const accounts = ref([])
 const centers = ref([])
 const vendors = ref([])
