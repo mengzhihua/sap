@@ -1,0 +1,5 @@
+package com.sap.fi.mapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sap.fi.entity.AssetTransaction;
+import org.apache.ibatis.annotations.Mapper;
+@Mapper public interface AssetTransactionMapper extends BaseMapper<AssetTransaction> {}

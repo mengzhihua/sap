@@ -99,3 +99,19 @@ CREATE TABLE IF NOT EXISTS sap_confirmation (id BIGINT AUTO_INCREMENT PRIMARY KE
 CREATE TABLE IF NOT EXISTS sap_vendor_evaluation (id BIGINT AUTO_INCREMENT PRIMARY KEY, lifnr VARCHAR(64), period VARCHAR(32), score DECIMAL(18,2), grade VARCHAR(16), UNIQUE(lifnr,period));
 CREATE TABLE IF NOT EXISTS sap_integration_log (id BIGINT AUTO_INCREMENT PRIMARY KEY, direction VARCHAR(8), system_name VARCHAR(32), action_name VARCHAR(64), request TEXT, response TEXT, success INT, error TEXT, elapsed_ms BIGINT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sap_bms_statement (id BIGINT AUTO_INCREMENT PRIMARY KEY, statement_no VARCHAR(128) UNIQUE, direction VARCHAR(8), partner_code VARCHAR(64), amount DECIMAL(18,2), tax_amount DECIMAL(18,2), biz_date DATE, remark VARCHAR(255), belnr VARCHAR(64), created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+
+-- FI-AA 固定资产台账与价值变动
+CREATE TABLE IF NOT EXISTS sap_fixed_asset (
+  anln1 VARCHAR(64) PRIMARY KEY, name VARCHAR(255) NOT NULL, asset_class VARCHAR(32) NOT NULL,
+  bukrs VARCHAR(16) NOT NULL, kostl VARCHAR(32), capitalization_date DATE,
+  useful_life_months INT NOT NULL, acquisition_value DECIMAL(18,2) DEFAULT 0,
+  accumulated_depreciation DECIMAL(18,2) DEFAULT 0, book_value DECIMAL(18,2) DEFAULT 0,
+  salvage_value DECIMAL(18,2) DEFAULT 0, status VARCHAR(32) DEFAULT 'CREATED',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS sap_asset_transaction (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, anln1 VARCHAR(64) NOT NULL, transaction_type VARCHAR(32) NOT NULL,
+  fiscal_period VARCHAR(16), posting_date DATE NOT NULL, amount DECIMAL(18,2) NOT NULL,
+  belnr VARCHAR(64), text VARCHAR(255), created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(anln1, transaction_type, fiscal_period)
+);
