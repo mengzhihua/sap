@@ -15,4 +15,9 @@ export const fiApi = {
   ar: (params) => http.get('/fi/ar/open-items', { params }),
   determination: () => http.get('/fi/account-determination'),
   updateDetermination: (data) => http.put('/fi/account-determination', data),
+  assets: (params) => http.get('/fi/assets', { params }),
+  createAsset: (data) => http.post('/fi/assets', data),
+  acquireAsset: (id, data) => http.post(`/fi/assets/${id}/acquisitions`, data),
+  assetTransactions: (id) => http.get(`/fi/assets/${id}/transactions`),
+  runDepreciation: (data) => http.post('/fi/depreciation-runs', data),
 }

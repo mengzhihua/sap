@@ -96,6 +96,13 @@ INSERT INTO sap_account_determination(account_key,saknr) SELECT 'VST','2211' WHE
 INSERT INTO sap_account_determination(account_key,saknr) SELECT 'AP','2201' WHERE NOT EXISTS (SELECT 1 FROM sap_account_determination WHERE account_key='AP');
 INSERT INTO sap_account_determination(account_key,saknr) SELECT 'AR','1122' WHERE NOT EXISTS (SELECT 1 FROM sap_account_determination WHERE account_key='AR');
 INSERT INTO sap_account_determination(account_key,saknr) SELECT 'BANK','1002' WHERE NOT EXISTS (SELECT 1 FROM sap_account_determination WHERE account_key='BANK');
+INSERT INTO sap_account_determination(account_key,saknr) SELECT 'ASSET_APC','1601' WHERE NOT EXISTS (SELECT 1 FROM sap_account_determination WHERE account_key='ASSET_APC');
+INSERT INTO sap_account_determination(account_key,saknr) SELECT 'ASSET_ACCUM_DEP','1602' WHERE NOT EXISTS (SELECT 1 FROM sap_account_determination WHERE account_key='ASSET_ACCUM_DEP');
+INSERT INTO sap_account_determination(account_key,saknr) SELECT 'DEPRECIATION','6602' WHERE NOT EXISTS (SELECT 1 FROM sap_account_determination WHERE account_key='DEPRECIATION');
+INSERT INTO sap_gl_account(saknr,txt,type,recon_type) SELECT '1601','固定资产原值','ASSET',NULL WHERE NOT EXISTS (SELECT 1 FROM sap_gl_account WHERE saknr='1601');
+INSERT INTO sap_gl_account(saknr,txt,type,recon_type) SELECT '1602','累计折旧','ASSET',NULL WHERE NOT EXISTS (SELECT 1 FROM sap_gl_account WHERE saknr='1602');
+INSERT INTO sap_gl_account(saknr,txt,type,recon_type) SELECT '6602','折旧费用','EXPENSE',NULL WHERE NOT EXISTS (SELECT 1 FROM sap_gl_account WHERE saknr='6602');
+INSERT INTO sap_number_range(object_name,prefix,current_no) SELECT 'ASSET','A',100000 WHERE NOT EXISTS (SELECT 1 FROM sap_number_range WHERE object_name='ASSET');
 
 INSERT INTO sap_stock(matnr,werks,lgort,unrestricted_qty,value)
 SELECT 'M1001','1000','0001',500,22500 WHERE NOT EXISTS (SELECT 1 FROM sap_stock WHERE matnr='M1001' AND werks='1000' AND lgort='0001');
@@ -168,3 +175,6 @@ INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'SE16','BASIS','事务代�
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'SM37','BASIS','操作日志','/basis/op-logs' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='SM37');
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'SPRO','BASIS','组织结构','/basis/org' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='SPRO');
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'SLG1','INTEGRATION','集成日志','/integration/logs' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='SLG1');
+INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AS01','FI-AA','创建固定资产','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AS01');
+INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AW01N','FI-AA','资产浏览器','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AW01N');
+INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AFAB','FI-AA','折旧运行','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AFAB');
