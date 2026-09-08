@@ -178,3 +178,4 @@ INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'SLG1','INTEGRATION','集�
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AS01','FI-AA','创建固定资产','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AS01');
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AW01N','FI-AA','资产浏览器','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AW01N');
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AFAB','FI-AA','折旧运行','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AFAB');
+INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'OB52','FI','打开和关闭过账期间','/fi/posting-periods' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='OB52');
