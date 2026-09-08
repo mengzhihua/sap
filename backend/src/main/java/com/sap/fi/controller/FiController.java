@@ -7,6 +7,7 @@ import com.sap.fi.dto.*;
 import com.sap.fi.entity.*;
 import com.sap.fi.mapper.*;
 import com.sap.fi.service.AccountingDocumentService;
+import com.sap.fi.service.PostingPeriodService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,13 +28,16 @@ public class FiController {
     private final AccountingDocumentItemMapper items;
     private final AccountDeterminationMapper determination;
     private final PaymentMapper payments;
+    private final PostingPeriodService postingPeriods;
 
     public FiController(JdbcTemplate jdbc, AccountingDocumentService accounting, GlAccountMapper accounts,
                         AccountingDocumentMapper documents, AccountingDocumentItemMapper items,
-                        AccountDeterminationMapper determination, PaymentMapper payments) {
+                        AccountDeterminationMapper determination, PaymentMapper payments,
+                        PostingPeriodService postingPeriods) {
         this.jdbc = jdbc; this.accounting = accounting; this.accounts = accounts;
         this.documents = documents; this.items = items; this.determination = determination;
         this.payments = payments;
+        this.postingPeriods = postingPeriods;
     }
 
     @GetMapping("/gl-accounts")
@@ -131,6 +135,20 @@ public class FiController {
     @GetMapping("/payments")
     public R<List<Payment>> payments() {
         return R.ok(payments.selectList(null));
+    }
+
+    @GetMapping("/posting-periods")
+    public R<List<PostingPeriod>> postingPeriods() { return R.ok(postingPeriods.list()); }
+
+    @PostMapping("/posting-periods")
+    public R<PostingPeriod> savePostingPeriod(@RequestBody PostingPeriod period) {
+        return R.ok(postingPeriods.save(period));
+    }
+
+    @DeleteMapping("/posting-periods/{id}")
+    public R<Void> deletePostingPeriod(@PathVariable long id) {
+        postingPeriods.delete(id);
+        return R.ok(null);
     }
 
     private List<AccountingDocumentItem> openItems(String account, String partner, boolean ap) {

@@ -30,17 +30,19 @@ public class AccountingDocumentService {
     private final PaymentMapper payments;
     private final CoDocumentMapper coDocuments;
     private final NumberRangeService numbers;
+    private final PostingPeriodService postingPeriods;
 
     public AccountingDocumentService(AccountingDocumentMapper documents,
                                      AccountingDocumentItemMapper items,
                                      PaymentMapper payments,
                                      CoDocumentMapper coDocuments,
-                                     NumberRangeService numbers) {
+                                     NumberRangeService numbers, PostingPeriodService postingPeriods) {
         this.documents = documents;
         this.items = items;
         this.payments = payments;
         this.coDocuments = coDocuments;
         this.numbers = numbers;
+        this.postingPeriods = postingPeriods;
     }
 
     @Transactional
@@ -50,7 +52,10 @@ public class AccountingDocumentService {
             lines.add(new FiLine(item.getSaknr(), item.getShkzg(), item.getAmount(), item.getKostl(),
                     item.getLifnr(), item.getKunnr(), item.getText()));
         }
-        return document(request.getBlart(), request.getSource(), null, lines);
+        LocalDate postingDate = request.getBudat() == null ? LocalDate.now() : request.getBudat();
+        LocalDate documentDate = request.getBldat() == null ? postingDate : request.getBldat();
+        return document(request.getBlart(), request.getSource(), request.getRefNo(), lines,
+                request.getBukrs(), request.getWaers(), postingDate, documentDate, request.getHeaderText());
     }
 
     @Transactional
@@ -122,6 +127,15 @@ public class AccountingDocumentService {
     }
 
     private AccountingDocument document(String blart, String source, String refNo, List<FiLine> lines) {
+        return document(blart, source, refNo, lines, "1000", "CNY", LocalDate.now(), LocalDate.now(), source);
+    }
+
+    private AccountingDocument document(String blart, String source, String refNo, List<FiLine> lines,
+                                          String bukrs, String waers, LocalDate postingDate,
+                                          LocalDate documentDate, String headerText) {
+        bukrs = bukrs == null || bukrs.trim().isEmpty() ? "1000" : bukrs;
+        waers = waers == null || waers.trim().isEmpty() ? "CNY" : waers;
+        postingPeriods.assertOpen(bukrs, postingDate);
         if (lines.size() < 2) throw new BizException("会计凭证至少需要两行");
         BigDecimal debit = BigDecimal.ZERO;
         BigDecimal credit = BigDecimal.ZERO;
@@ -137,13 +151,13 @@ public class AccountingDocumentService {
         String belnr = numbers.next("FI");
         AccountingDocument document = new AccountingDocument();
         document.setBelnr(belnr);
-        document.setGjahr(String.valueOf(LocalDate.now().getYear()));
-        document.setBukrs("1000");
+        document.setGjahr(String.valueOf(postingDate.getYear()));
+        document.setBukrs(bukrs);
         document.setBlart(blart);
-        document.setBudat(LocalDate.now());
-        document.setBldat(LocalDate.now());
-        document.setWaers("CNY");
-        document.setHeaderText(source);
+        document.setBudat(postingDate);
+        document.setBldat(documentDate);
+        document.setWaers(waers);
+        document.setHeaderText(headerText == null || headerText.trim().isEmpty() ? source : headerText);
         document.setRefNo(refNo);
         document.setSource(source);
         documents.insert(document);
@@ -167,7 +181,7 @@ public class AccountingDocumentService {
                 co.setKostl(line.kostl);
                 co.setCostElement(line.saknr);
                 co.setAmount(line.amount);
-                co.setBudat(LocalDate.now());
+                co.setBudat(postingDate);
                 co.setDocumentText(line.text);
                 coDocuments.insert(co);
             }

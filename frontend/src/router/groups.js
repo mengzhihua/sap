@@ -38,6 +38,7 @@ export const groups = [
       ['FBL1N', '应付未清项', '/fi/ap', () => import('../views/fi/OpenItemsAp.vue')],
       ['FBL5N', '应收未清项', '/fi/ar', () => import('../views/fi/OpenItemsAr.vue')],
       ['OBYC', '科目确定', '/fi/determination', () => import('../views/fi/AccountDetermination.vue')],
+      ['OB52', '过账期间', '/fi/posting-periods', () => import('../views/fi/PostingPeriods.vue')],
       ['AS01', '固定资产', '/fi/assets', () => import('../views/fi/FixedAssetList.vue')],
       ['AW01N', '资产浏览器', '/fi/assets', () => import('../views/fi/FixedAssetList.vue')],
       ['AFAB', '折旧运行', '/fi/assets', () => import('../views/fi/FixedAssetList.vue')],
