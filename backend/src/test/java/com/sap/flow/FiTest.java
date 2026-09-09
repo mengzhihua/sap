@@ -10,11 +10,13 @@ import com.sap.fi.mapper.PostingPeriodMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Transactional
 public class FiTest extends TestSupport {
     @Autowired
     private AccountingDocumentService service;
