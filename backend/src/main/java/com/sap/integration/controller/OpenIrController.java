@@ -3,9 +3,11 @@ package com.sap.integration.controller;
 import com.sap.common.BizException;
 import com.sap.common.R;
 import com.sap.mm.dto.PurchaseReqRequest;
+import com.sap.mm.entity.Material;
 import com.sap.mm.entity.PurchaseOrder;
 import com.sap.mm.entity.PurchaseReq;
 import com.sap.mm.entity.Stock;
+import com.sap.mm.mapper.MaterialMapper;
 import com.sap.mm.mapper.PurchaseOrderMapper;
 import com.sap.mm.mapper.StockMapper;
 import com.sap.mm.service.PurchaseReqService;
@@ -32,6 +34,7 @@ import java.util.Map;
 @RequestMapping("/api/open/ir")
 public class OpenIrController {
     private final StockMapper stocks;
+    private final MaterialMapper materials;
     private final PurchaseReqService purchaseReqs;
     private final PurchaseOrderMapper purchaseOrders;
     private final ProductionOrderMapper productionOrders;
@@ -40,12 +43,14 @@ public class OpenIrController {
 
     public OpenIrController(
             StockMapper stocks,
+            MaterialMapper materials,
             PurchaseReqService purchaseReqs,
             PurchaseOrderMapper purchaseOrders,
             ProductionOrderMapper productionOrders,
             ProductionOrderService productionOrderService,
             @Value("${sap.open.api-key:sap-open-key}") String apiKey) {
         this.stocks = stocks;
+        this.materials = materials;
         this.purchaseReqs = purchaseReqs;
         this.purchaseOrders = purchaseOrders;
         this.productionOrders = productionOrders;
@@ -60,10 +65,11 @@ public class OpenIrController {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Stock stock : stocks.selectList(null)) {
             BigDecimal qty = nz(stock.getUnrestrictedQty());
+            String sku = aliasOf(stock.getMatnr());
             rows.add(row("STOCK", stock.getMatnr() + "/" + stock.getWerks() + "/" + stock.getLgort(),
                     qty.compareTo(BigDecimal.TEN) < 0 ? "LOW" : "OK",
-                    stock.getMatnr(), qty, stock.getStockValue(), stock.getWerks(),
-                    stock.getMatnr() + " " + stock.getWerks() + "/" + stock.getLgort()));
+                    sku, qty, stock.getStockValue(), stock.getWerks(),
+                    sku + " " + stock.getWerks() + "/" + stock.getLgort()));
         }
         for (PurchaseReq pr : purchaseReqs.list()) {
             rows.add(row("PR", pr.getBanfn(), pr.getStatus(), firstMatnr(pr),
@@ -143,6 +149,15 @@ public class OpenIrController {
         row.put("plantCode", plantCode);
         row.put("title", title);
         return row;
+    }
+
+    private String aliasOf(String matnr) {
+        Material material = materials.selectById(matnr);
+        if (material != null && material.getAliasCode() != null
+                && !material.getAliasCode().trim().isEmpty()) {
+            return material.getAliasCode();
+        }
+        return matnr;
     }
 
     private static String firstMatnr(PurchaseReq pr) {

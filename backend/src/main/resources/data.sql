@@ -52,6 +52,8 @@ INSERT INTO sap_material(matnr,maktx,meins,mtart,matkl,std_price,price_control,a
 SELECT 'M1004','半成品组件','EA','HALB','SEMI',80.00,'S','SKU004' WHERE NOT EXISTS (SELECT 1 FROM sap_material WHERE matnr='M1004');
 INSERT INTO sap_material(matnr,maktx,meins,mtart,matkl,std_price,price_control,alias_code)
 SELECT 'F2001','成品控制器','EA','FERT','FIN',300.00,'S','F2001' WHERE NOT EXISTS (SELECT 1 FROM sap_material WHERE matnr='F2001');
+INSERT INTO sap_material(matnr,maktx,meins,mtart,matkl,std_price,price_control,alias_code)
+SELECT 'M1099','IR 联调低库存物料','EA','ROH','RAW',45.00,'S','MAT-1000' WHERE NOT EXISTS (SELECT 1 FROM sap_material WHERE matnr='M1099');
 INSERT INTO sap_customer(kunnr,name,alias_code,recon_account)
 SELECT '200010','上海客户','CUST-001','1122' WHERE NOT EXISTS (SELECT 1 FROM sap_customer WHERE kunnr='200010');
 INSERT INTO sap_customer(kunnr,name,alias_code,recon_account)
@@ -114,6 +116,8 @@ INSERT INTO sap_stock(matnr,werks,lgort,unrestricted_qty,value)
 SELECT 'M1004','1000','0001',100,8000 WHERE NOT EXISTS (SELECT 1 FROM sap_stock WHERE matnr='M1004' AND werks='1000' AND lgort='0001');
 INSERT INTO sap_stock(matnr,werks,lgort,unrestricted_qty,value)
 SELECT 'F2001','1000','0002',20,6000 WHERE NOT EXISTS (SELECT 1 FROM sap_stock WHERE matnr='F2001' AND werks='1000' AND lgort='0002');
+INSERT INTO sap_stock(matnr,werks,lgort,unrestricted_qty,value)
+SELECT 'M1099','1000','0001',3,135 WHERE NOT EXISTS (SELECT 1 FROM sap_stock WHERE matnr='M1099' AND werks='1000' AND lgort='0001');
 
 INSERT INTO sap_bom(matnr,werks,base_qty)
 SELECT 'F2001','1000',1 WHERE NOT EXISTS (SELECT 1 FROM sap_bom WHERE matnr='F2001' AND werks='1000');
