@@ -190,3 +190,6 @@ WHERE NOT EXISTS (SELECT 1 FROM sap_purchase_req WHERE banfn='IR1000001');
 INSERT INTO sap_purchase_req_item(banfn, bnfpo, matnr, menge, netpr, werks, lgort)
 SELECT 'IR1000001', '10', 'M1099', 16, 45.00, '1000', '0001'
 WHERE NOT EXISTS (SELECT 1 FROM sap_purchase_req_item WHERE banfn='IR1000001' AND bnfpo='10');
+INSERT INTO sap_production_order(aufnr, matnr, werks, target_qty, delivered_qty, status, planned_cost, actual_cost)
+SELECT 'IR10000100', 'F2001', '1000', 10, 0, 'CRTD', 3000.00, 0
+WHERE NOT EXISTS (SELECT 1 FROM sap_production_order WHERE aufnr='IR10000100');

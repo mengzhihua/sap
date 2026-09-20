@@ -82,7 +82,7 @@ public class OpenIrController {
                     "采购订单 " + po.getEbeln()));
         }
         for (ProductionOrder mo : productionOrders.selectList(null)) {
-            rows.add(row("MO", mo.getAufnr(), mo.getStatus(), mo.getMatnr(),
+            rows.add(row("MO", mo.getAufnr(), moStatus(mo.getStatus()), mo.getMatnr(),
                     mo.getTargetQty(), mo.getPlannedCost(), mo.getWerks(),
                     "生产订单 " + mo.getAufnr()));
         }
@@ -149,6 +149,16 @@ public class OpenIrController {
         row.put("plantCode", plantCode);
         row.put("title", title);
         return row;
+    }
+
+    private static String moStatus(String status) {
+        if ("CRTD".equals(status)) {
+            return "CREATED";
+        }
+        if ("REL".equals(status)) {
+            return "RELEASED";
+        }
+        return status;
     }
 
     private String aliasOf(String matnr) {
