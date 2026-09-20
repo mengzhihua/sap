@@ -183,3 +183,10 @@ INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AS01','FI-AA','创建固�
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AW01N','FI-AA','资产浏览器','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AW01N');
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'AFAB','FI-AA','折旧运行','/fi/assets' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='AFAB');
 INSERT INTO sap_tcode(tcode,module,name,route) SELECT 'OB52','FI','打开和关闭过账期间','/fi/posting-periods' WHERE NOT EXISTS (SELECT 1 FROM sap_tcode WHERE tcode='OB52');
+
+INSERT INTO sap_purchase_req(banfn, status, requester, bukrs, werks, total_amount)
+SELECT 'IR1000001', 'CREATED', 'IR', '1000', '1000', 720
+WHERE NOT EXISTS (SELECT 1 FROM sap_purchase_req WHERE banfn='IR1000001');
+INSERT INTO sap_purchase_req_item(banfn, bnfpo, matnr, menge, netpr, werks, lgort)
+SELECT 'IR1000001', '10', 'M1099', 16, 45.00, '1000', '0001'
+WHERE NOT EXISTS (SELECT 1 FROM sap_purchase_req_item WHERE banfn='IR1000001' AND bnfpo='10');

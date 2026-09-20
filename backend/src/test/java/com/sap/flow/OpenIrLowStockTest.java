@@ -39,6 +39,15 @@ public class OpenIrLowStockTest extends TestSupport {
             }
         }
         org.junit.jupiter.api.Assertions.assertTrue(foundLow, "种子物料 M1099/MAT-1000 应为 LOW");
+        boolean foundPr = false;
+        for (JsonNode row : objectMapper.readTree(body).get("data").get("snapshots")) {
+            if ("PR".equals(row.path("dataType").asText())
+                    && "IR1000001".equals(row.path("bizKey").asText())
+                    && "CREATED".equals(row.path("status").asText())) {
+                foundPr = true;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(foundPr, "应包含待释放采购申请 IR1000001");
 
         mockMvc.perform(post("/api/open/ir/actions")
                         .header("X-Api-Key", "sap-open-key")
