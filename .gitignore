@@ -7,3 +7,5 @@ backend/target/
 backend/data/
 *.mv.db
 *.trace.db
+release/
+backend/src/main/resources/static/
