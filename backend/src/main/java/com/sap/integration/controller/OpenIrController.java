@@ -1,7 +1,12 @@
 package com.sap.integration.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sap.common.BizException;
 import com.sap.common.R;
+import com.sap.fi.entity.AccountingDocument;
+import com.sap.fi.entity.AccountingDocumentItem;
+import com.sap.fi.mapper.AccountingDocumentItemMapper;
+import com.sap.fi.mapper.AccountingDocumentMapper;
 import com.sap.mm.dto.PurchaseReqRequest;
 import com.sap.mm.entity.Material;
 import com.sap.mm.entity.PurchaseOrder;
@@ -29,7 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** IR 控制塔开放口：库存 / PR / PO / 生产订单快照与指令。 */
+/** IR 控制塔开放口：库存 / PR / PO / 生产订单 / 财务未清项快照与指令。 */
 @RestController
 @RequestMapping("/api/open/ir")
 public class OpenIrController {
@@ -39,6 +44,8 @@ public class OpenIrController {
     private final PurchaseOrderMapper purchaseOrders;
     private final ProductionOrderMapper productionOrders;
     private final ProductionOrderService productionOrderService;
+    private final AccountingDocumentMapper documents;
+    private final AccountingDocumentItemMapper documentItems;
     private final String apiKey;
 
     public OpenIrController(
@@ -48,6 +55,8 @@ public class OpenIrController {
             PurchaseOrderMapper purchaseOrders,
             ProductionOrderMapper productionOrders,
             ProductionOrderService productionOrderService,
+            AccountingDocumentMapper documents,
+            AccountingDocumentItemMapper documentItems,
             @Value("${sap.open.api-key:sap-open-key}") String apiKey) {
         this.stocks = stocks;
         this.materials = materials;
@@ -55,6 +64,8 @@ public class OpenIrController {
         this.purchaseOrders = purchaseOrders;
         this.productionOrders = productionOrders;
         this.productionOrderService = productionOrderService;
+        this.documents = documents;
+        this.documentItems = documentItems;
         this.apiKey = apiKey;
     }
 
@@ -86,6 +97,7 @@ public class OpenIrController {
                     mo.getTargetQty(), mo.getPlannedCost(), mo.getWerks(),
                     "生产订单 " + mo.getAufnr()));
         }
+        appendOpenFi(rows);
         return R.ok(payload("SAP", rows));
     }
 
@@ -108,6 +120,39 @@ public class OpenIrController {
                     first(str(params.get("aufnr")), targetKey)));
         }
         throw new BizException("不支持的 IR 指令: " + type);
+    }
+
+    private void appendOpenFi(List<Map<String, Object>> rows) {
+        List<AccountingDocument> openDocs = documents.selectList(new LambdaQueryWrapper<AccountingDocument>()
+                .isNull(AccountingDocument::getClearedBy)
+                .isNull(AccountingDocument::getReversedBy)
+                .ne(AccountingDocument::getBlart, "AB"));
+        if (openDocs.isEmpty()) {
+            return;
+        }
+        Map<String, AccountingDocument> byBelnr = new LinkedHashMap<String, AccountingDocument>();
+        for (AccountingDocument document : openDocs) {
+            byBelnr.put(document.getBelnr(), document);
+        }
+        appendOpenItems(rows, "AP_OPEN", "2201", true, byBelnr);
+        appendOpenItems(rows, "AR_OPEN", "1122", false, byBelnr);
+    }
+
+    private void appendOpenItems(
+            List<Map<String, Object>> rows, String dataType, String saknr, boolean ap,
+            Map<String, AccountingDocument> byBelnr) {
+        List<AccountingDocumentItem> openItems = documentItems.selectList(
+                new LambdaQueryWrapper<AccountingDocumentItem>()
+                        .eq(AccountingDocumentItem::getSaknr, saknr)
+                        .in(AccountingDocumentItem::getBelnr, byBelnr.keySet()));
+        for (AccountingDocumentItem item : openItems) {
+            AccountingDocument document = byBelnr.get(item.getBelnr());
+            String partner = ap ? item.getLifnr() : item.getKunnr();
+            String title = (ap ? "应付未清 " : "应收未清 ") + item.getBelnr();
+            rows.add(row(dataType, item.getBelnr() + "/" + nzStr(item.getBuzei()),
+                    "OPEN", partner, BigDecimal.ONE, nz(item.getAmount()),
+                    document == null ? null : document.getBukrs(), title));
+        }
     }
 
     private PurchaseReqRequest prRequest(String targetKey, Map<String, Object> params) {
@@ -198,6 +243,10 @@ public class OpenIrController {
 
     private static BigDecimal nz(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static String nzStr(String value) {
+        return value == null ? "" : value;
     }
 
     private static BigDecimal decimal(Object value, BigDecimal fallback) {

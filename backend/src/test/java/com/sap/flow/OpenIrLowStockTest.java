@@ -57,6 +57,22 @@ public class OpenIrLowStockTest extends TestSupport {
             }
         }
         org.junit.jupiter.api.Assertions.assertTrue(foundMo, "应包含待释放生产订单 IR10000100");
+        boolean foundAp = false;
+        boolean foundAr = false;
+        for (JsonNode row : objectMapper.readTree(body).get("data").get("snapshots")) {
+            if ("AP_OPEN".equals(row.path("dataType").asText())
+                    && "IRFI0001/1".equals(row.path("bizKey").asText())) {
+                foundAp = true;
+                org.junit.jupiter.api.Assertions.assertEquals("OPEN", row.path("status").asText());
+            }
+            if ("AR_OPEN".equals(row.path("dataType").asText())
+                    && "IRFI0002/1".equals(row.path("bizKey").asText())) {
+                foundAr = true;
+                org.junit.jupiter.api.Assertions.assertEquals("OPEN", row.path("status").asText());
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(foundAp, "应包含应付未清 IRFI0001");
+        org.junit.jupiter.api.Assertions.assertTrue(foundAr, "应包含应收未清 IRFI0002");
 
         mockMvc.perform(post("/api/open/ir/actions")
                         .header("X-Api-Key", "sap-open-key")
