@@ -33,6 +33,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /** IR 控制塔开放口：库存 / PR / PO / 生产订单 / 财务未清项快照与指令。 */
 @RestController
@@ -47,6 +49,7 @@ public class OpenIrController {
     private final AccountingDocumentMapper documents;
     private final AccountingDocumentItemMapper documentItems;
     private final String apiKey;
+    private final ConcurrentHashMap<String, Object> actionCache = new ConcurrentHashMap<String, Object>();
 
     public OpenIrController(
             StockMapper stocks,
@@ -109,17 +112,46 @@ public class OpenIrController {
         String type = str(body.get("type"));
         String targetKey = str(body.get("targetKey"));
         Map<String, Object> params = params(body);
-        if ("SAP_CREATE_PR".equals(type)) {
-            return R.ok(purchaseReqs.create(prRequest(targetKey, params)));
+        return R.ok(executeOnce(cacheKey(type, targetKey, body.get("idempotencyKey")), () -> {
+            if ("SAP_CREATE_PR".equals(type)) {
+                return purchaseReqs.create(prRequest(targetKey, params));
+            }
+            if ("SAP_RELEASE_PR".equals(type)) {
+                return purchaseReqs.release(first(str(params.get("banfn")), targetKey));
+            }
+            if ("SAP_RELEASE_MO".equals(type)) {
+                return productionOrderService.release(
+                        first(str(params.get("aufnr")), targetKey));
+            }
+            throw new BizException("不支持的 IR 指令: " + type);
+        }));
+    }
+
+    private Object executeOnce(String cacheKey, Supplier<Object> work) {
+        if (cacheKey == null) {
+            return work.get();
         }
-        if ("SAP_RELEASE_PR".equals(type)) {
-            return R.ok(purchaseReqs.release(first(str(params.get("banfn")), targetKey)));
+        Object cached = actionCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
         }
-        if ("SAP_RELEASE_MO".equals(type)) {
-            return R.ok(productionOrderService.release(
-                    first(str(params.get("aufnr")), targetKey)));
+        synchronized (actionCache) {
+            cached = actionCache.get(cacheKey);
+            if (cached != null) {
+                return cached;
+            }
+            Object created = work.get();
+            actionCache.put(cacheKey, created);
+            return created;
         }
-        throw new BizException("不支持的 IR 指令: " + type);
+    }
+
+    private static String cacheKey(String type, String targetKey, Object idempotencyKey) {
+        String key = str(idempotencyKey);
+        if (key == null || key.trim().isEmpty() || "null".equals(key)) {
+            return null;
+        }
+        return type + "|" + (targetKey == null ? "" : targetKey) + "|" + key.trim();
     }
 
     private void appendOpenFi(List<Map<String, Object>> rows) {
