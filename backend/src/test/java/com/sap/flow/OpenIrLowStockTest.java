@@ -39,6 +39,32 @@ public class OpenIrLowStockTest extends TestSupport {
             }
         }
         org.junit.jupiter.api.Assertions.assertTrue(foundLow, "种子物料 M1099/MAT-1000 应为 LOW");
+        boolean foundPr = false;
+        for (JsonNode row : objectMapper.readTree(body).get("data").get("snapshots")) {
+            if ("PR".equals(row.path("dataType").asText())
+                    && "IR1000001".equals(row.path("bizKey").asText())
+                    && "CREATED".equals(row.path("status").asText())) {
+                foundPr = true;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(foundPr, "应包含待释放采购申请 IR1000001");
+        boolean foundMo = false;
+        for (JsonNode row : objectMapper.readTree(body).get("data").get("snapshots")) {
+            if ("MO".equals(row.path("dataType").asText())
+                    && "IR10000100".equals(row.path("bizKey").asText())
+                    && "CREATED".equals(row.path("status").asText())) {
+                foundMo = true;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(foundMo, "应包含待释放生产订单 IR10000100");
+
+        mockMvc.perform(post("/api/open/ir/actions")
+                        .header("X-Api-Key", "sap-open-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"SAP_RELEASE_MO\",\"targetKey\":\"IR10000100\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("REL"));
 
         mockMvc.perform(post("/api/open/ir/actions")
                         .header("X-Api-Key", "sap-open-key")
