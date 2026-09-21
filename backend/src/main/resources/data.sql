@@ -193,3 +193,26 @@ WHERE NOT EXISTS (SELECT 1 FROM sap_purchase_req_item WHERE banfn='IR1000001' AN
 INSERT INTO sap_production_order(aufnr, matnr, werks, target_qty, delivered_qty, status, planned_cost, actual_cost)
 SELECT 'IR10000100', 'F2001', '1000', 10, 0, 'CRTD', 3000.00, 0
 WHERE NOT EXISTS (SELECT 1 FROM sap_production_order WHERE aufnr='IR10000100');
+
+-- IR HTTP 联调：应付 / 应收未清项，供 AP_OPEN / AR_OPEN
+INSERT INTO sap_acc_document(belnr, gjahr, bukrs, blart, budat, bldat, waers, header_text, ref_no, source)
+SELECT 'IRFI0001', CAST(YEAR(CURRENT_DATE) AS CHAR), '1000', 'KR', CURRENT_DATE, CURRENT_DATE, 'CNY',
+       'IR应付未清', '100010', 'IR'
+WHERE NOT EXISTS (SELECT 1 FROM sap_acc_document WHERE belnr='IRFI0001');
+INSERT INTO sap_acc_document_item(belnr, buzei, bschl, shkzg, saknr, lifnr, amount, text)
+SELECT 'IRFI0001', '1', '50', 'H', '2201', '100010', 18650.00, '应付未清'
+WHERE NOT EXISTS (SELECT 1 FROM sap_acc_document_item WHERE belnr='IRFI0001' AND buzei='1');
+INSERT INTO sap_acc_document_item(belnr, buzei, bschl, shkzg, saknr, amount, text)
+SELECT 'IRFI0001', '2', '40', 'S', '1405', 18650.00, '库存'
+WHERE NOT EXISTS (SELECT 1 FROM sap_acc_document_item WHERE belnr='IRFI0001' AND buzei='2');
+
+INSERT INTO sap_acc_document(belnr, gjahr, bukrs, blart, budat, bldat, waers, header_text, ref_no, source)
+SELECT 'IRFI0002', CAST(YEAR(CURRENT_DATE) AS CHAR), '1000', 'DR', CURRENT_DATE, CURRENT_DATE, 'CNY',
+       'IR应收未清', '200010', 'IR'
+WHERE NOT EXISTS (SELECT 1 FROM sap_acc_document WHERE belnr='IRFI0002');
+INSERT INTO sap_acc_document_item(belnr, buzei, bschl, shkzg, saknr, kunnr, amount, text)
+SELECT 'IRFI0002', '1', '01', 'S', '1122', '200010', 24230.00, '应收未清'
+WHERE NOT EXISTS (SELECT 1 FROM sap_acc_document_item WHERE belnr='IRFI0002' AND buzei='1');
+INSERT INTO sap_acc_document_item(belnr, buzei, bschl, shkzg, saknr, amount, text)
+SELECT 'IRFI0002', '2', '50', 'H', '6001', 24230.00, '收入'
+WHERE NOT EXISTS (SELECT 1 FROM sap_acc_document_item WHERE belnr='IRFI0002' AND buzei='2');
