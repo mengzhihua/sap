@@ -82,14 +82,28 @@ public class OpenIrLowStockTest extends TestSupport {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("REL"));
 
-        mockMvc.perform(post("/api/open/ir/actions")
+        String created = mockMvc.perform(post("/api/open/ir/actions")
                         .header("X-Api-Key", "sap-open-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"SAP_CREATE_PR\",\"targetKey\":\"MAT-1000\","
+                                + "\"idempotencyKey\":\"SAP-PR-1\","
                                 + "\"params\":{\"sku\":\"MAT-1000\",\"qty\":16,\"plantCode\":\"1000\"}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.banfn").isString())
-                .andExpect(jsonPath("$.data.status").value("CREATED"));
+                .andExpect(jsonPath("$.data.status").value("CREATED"))
+                .andReturn().getResponse().getContentAsString();
+        String replay = mockMvc.perform(post("/api/open/ir/actions")
+                        .header("X-Api-Key", "sap-open-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"SAP_CREATE_PR\",\"targetKey\":\"MAT-1000\","
+                                + "\"idempotencyKey\":\"SAP-PR-1\","
+                                + "\"params\":{\"sku\":\"MAT-1000\",\"qty\":16,\"plantCode\":\"1000\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertEquals(
+                objectMapper.readTree(created).get("data").get("banfn").asText(),
+                objectMapper.readTree(replay).get("data").get("banfn").asText());
     }
 }
