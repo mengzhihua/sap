@@ -114,5 +114,24 @@ public class OpenIrLowStockTest extends TestSupport {
         org.junit.jupiter.api.Assertions.assertEquals(
                 objectMapper.readTree(created).get("data").get("banfn").asText(),
                 objectMapper.readTree(replay).get("data").get("banfn").asText());
+
+        mockMvc.perform(post("/api/open/ir/release-mo")
+                        .header("X-Api-Key", "sap-open-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"aufnr\":\"IR10000100\",\"idempotencyKey\":\"SAP-MO-1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("REL"));
+        String dedicatedPr = mockMvc.perform(post("/api/open/ir/create-pr")
+                        .header("X-Api-Key", "sap-open-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sku\":\"MAT-1000\",\"idempotencyKey\":\"SAP-PR-1\","
+                                + "\"params\":{\"sku\":\"MAT-1000\",\"qty\":16,\"plantCode\":\"1000\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertEquals(
+                objectMapper.readTree(created).get("data").get("banfn").asText(),
+                objectMapper.readTree(dedicatedPr).get("data").get("banfn").asText());
     }
 }
