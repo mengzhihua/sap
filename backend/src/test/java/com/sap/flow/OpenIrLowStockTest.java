@@ -77,7 +77,16 @@ public class OpenIrLowStockTest extends TestSupport {
         mockMvc.perform(post("/api/open/ir/actions")
                         .header("X-Api-Key", "sap-open-key")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"SAP_RELEASE_MO\",\"targetKey\":\"IR10000100\"}"))
+                        .content("{\"type\":\"SAP_RELEASE_MO\",\"targetKey\":\"IR10000100\","
+                                + "\"idempotencyKey\":\"SAP-MO-1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("REL"));
+        mockMvc.perform(post("/api/open/ir/actions")
+                        .header("X-Api-Key", "sap-open-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"SAP_RELEASE_MO\",\"targetKey\":\"IR10000100\","
+                                + "\"idempotencyKey\":\"SAP-MO-1\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("REL"));
