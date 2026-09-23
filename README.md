@@ -374,6 +374,12 @@ docker compose logs mysql
 
 > `docker compose down -v` 是破坏性操作，请勿对需要保留的数据执行。
 
+## 控制塔对接
+
+库存、采购、生产和未清项快照，以及建采购申请、释放申请、释放生产订单，见 [技术方案](docs/技术方案.md)。
+
+有 API Key 时走 `/api/open/ir/snapshots` 和 `/actions`，并回退 `/create-pr`、`/release-pr`、`/release-mo`。没有 Key 时，控制塔登录后打 `POST /api/mm/pr`、采购申请释放和生产订单释放。
+
 ## 发布包（开箱即用）
 
 前端生产构建打进 Spring Boot 可执行 JAR。三种用法：
