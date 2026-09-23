@@ -74,6 +74,15 @@ public class GoodsMovementService {
 
     @Transactional
     public MaterialDocument receivePo(MigoRequest request) {
+        if (request.getRefNo() != null && !request.getRefNo().trim().isEmpty()) {
+            MaterialDocument existing = documents.selectOne(new LambdaQueryWrapper<MaterialDocument>()
+                    .eq(MaterialDocument::getRefNo, request.getRefNo().trim())
+                    .eq(MaterialDocument::getBwart, "101")
+                    .last("LIMIT 1"));
+            if (existing != null) {
+                return existing;
+            }
+        }
         PurchaseOrder order = purchaseOrders.find(request.getRefNo());
         String mblnr = numbers.next("MATERIAL");
         BigDecimal total = BigDecimal.ZERO;

@@ -52,6 +52,38 @@ public class DeliveryService {
         this.materialDocuments = materialDocuments; this.materialDocumentItems = materialDocumentItems;
     }
 
+    /** OMS 发货过账。同一外部单号重复推送返回原交货单，不要求事先有销售订单。 */
+    @Transactional
+    public Delivery postExternal(String externalNo, String kunnr, String matnr, BigDecimal qty) {
+        if (externalNo == null || externalNo.trim().isEmpty()) {
+            throw new BizException("外部单号不能为空");
+        }
+        String ref = externalNo.trim();
+        Delivery existing = deliveries.selectOne(new LambdaQueryWrapper<Delivery>()
+                .eq(Delivery::getSoVbeln, ref).last("LIMIT 1"));
+        if (existing != null) {
+            return load(existing);
+        }
+        Delivery delivery = new Delivery();
+        delivery.setVbeln(numbers.next("DN"));
+        delivery.setSoVbeln(ref);
+        delivery.setKunnr(kunnr == null || kunnr.trim().isEmpty() ? "C1000" : kunnr.trim());
+        delivery.setWerks("1000");
+        delivery.setStatus("PGI");
+        delivery.setBmsSynced(0);
+        deliveries.insert(delivery);
+        DeliveryItem item = new DeliveryItem();
+        item.setVbeln(delivery.getVbeln());
+        item.setPosnr("10");
+        item.setMatnr(matnr == null || matnr.trim().isEmpty() ? "M1001" : matnr.trim());
+        BigDecimal pieces = qty == null || qty.signum() <= 0 ? BigDecimal.ONE : qty;
+        item.setQty(pieces);
+        item.setPickedQty(pieces);
+        item.setPgiQty(pieces);
+        deliveryItems.insert(item);
+        return load(delivery);
+    }
+
     @Transactional
     public Delivery create(DnCreateRequest request) {
         SalesOrder order = salesOrders.selectById(request.getSoVbeln());
